@@ -11,20 +11,21 @@ const supabase = createClient(
 export default function ConfirmPage() {
   useEffect(() => {
     async function confirm() {
-      const code = new URLSearchParams(window.location.search).get('code')
-      if (!code) { window.location.href = '/login?error=auth'; return }
+      // รอให้ Supabase จัดการ hash fragment ก่อน
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (session?.user) {
+        await supabase.from('customers').upsert({
+          id: session.user.id,
+          display_name: session.user.user_metadata?.full_name || session.user.user_metadata?.username,
+          email: session.user.email,
+          avatar_url: session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture
+        }, { onConflict: 'id' })
+        window.location.href = '/catalog'
+        return
+      }
 
-      const { data, error } = await supabase.auth.exchangeCodeForSession(code)
-      if (error || !data.user) { window.location.href = '/login?error=auth'; return }
-
-      await supabase.from('customers').upsert({
-        id: data.user.id,
-        display_name: data.user.user_metadata?.full_name || data.user.user_metadata?.username,
-        email: data.user.email,
-        avatar_url: data.user.user_metadata?.avatar_url
-      }, { onConflict: 'id' })
-
-      window.location.href = '/catalog'
+      window.location.href = '/login?error=auth'
     }
     confirm()
   }, [])

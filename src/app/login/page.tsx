@@ -9,18 +9,18 @@ const supabase = createClient(
 
 export default function LoginPage() {
   async function loginWithGoogle() {
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: `${window.location.origin}/auth/callback` }
-    })
-  }
+  await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: `https://card-catalog-pi.vercel.app/auth/confirm` }
+  })
+}
 
-  async function loginWithDiscord() {
-    await supabase.auth.signInWithOAuth({
-      provider: 'discord',
-      options: { redirectTo: `${window.location.origin}/auth/callback` }
-    })
-  }
+async function loginWithDiscord() {
+  await supabase.auth.signInWithOAuth({
+    provider: 'discord',
+    options: { redirectTo: `https://card-catalog-pi.vercel.app/auth/confirm` }
+  })
+}
 
   return (
     <main className="min-h-screen bg-blue-50 flex items-center justify-center p-4">
