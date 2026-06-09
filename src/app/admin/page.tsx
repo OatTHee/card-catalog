@@ -1,5 +1,5 @@
 'use client'
-
+import { uploadImage } from '@/lib/upload'
 import { useEffect, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
 
@@ -217,12 +217,21 @@ function AddProductModal({ sellers, onClose, onSaved }: {
   onClose: () => void,
   onSaved: () => void
 }) {
+    const [imageFile, setImageFile] = useState<File | null>(null)
+const [imagePreview, setImagePreview] = useState<string>('')
   const [name, setName] = useState('')
   const [type, setType] = useState('set')
   const [sellerId, setSellerId] = useState(sellers[0]?.id ?? '')
   const [description, setDescription] = useState('')
   const [variants, setVariants] = useState([{ name: '', price: '', stock: '' }])
   const [saving, setSaving] = useState(false)
+
+  function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+  const file = e.target.files?.[0]
+  if (!file) return
+  setImageFile(file)
+  setImagePreview(URL.createObjectURL(file))
+}
 
   function addVariantRow() {
     setVariants([...variants, { name: '', price: '', stock: '' }])
@@ -239,36 +248,42 @@ function AddProductModal({ sellers, onClose, onSaved }: {
   }
 
   async function handleSave() {
-    if (!name || !sellerId) return
-    setSaving(true)
+  if (!name || !sellerId) return
+  setSaving(true)
 
-    const { data: product, error } = await supabase
-      .from('products')
-      .insert({ name, type, seller_id: sellerId, description, is_available: true })
-      .select()
-      .single()
-
-    if (error || !product) {
-      console.error(error)
-      setSaving(false)
-      return
-    }
-
-    const validVariants = variants.filter(v => v.name && v.price)
-    if (validVariants.length > 0) {
-      await supabase.from('product_variants').insert(
-        validVariants.map(v => ({
-          product_id: product.id,
-          name: v.name,
-          price: Number(v.price),
-          stock: Number(v.stock) || 0
-        }))
-      )
-    }
-
-    setSaving(false)
-    onSaved()
+  let imageUrl = ''
+  if (imageFile) {
+    const url = await uploadImage(imageFile)
+    if (url) imageUrl = url
   }
+
+  const { data: product, error } = await supabase
+    .from('products')
+    .insert({ name, type, seller_id: sellerId, description, image_url: imageUrl, is_available: true })
+    .select()
+    .single()
+
+  if (error || !product) {
+    console.error(error)
+    setSaving(false)
+    return
+  }
+
+  const validVariants = variants.filter(v => v.name && v.price)
+  if (validVariants.length > 0) {
+    await supabase.from('product_variants').insert(
+      validVariants.map(v => ({
+        product_id: product.id,
+        name: v.name,
+        price: Number(v.price),
+        stock: Number(v.stock) || 0
+      }))
+    )
+  }
+
+  setSaving(false)
+  onSaved()
+}
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -321,7 +336,22 @@ function AddProductModal({ sellers, onClose, onSaved }: {
               rows={2}
             />
           </div>
-
+<div>
+  <label className="text-sm text-gray-600">รูปสินค้า</label>
+  <input
+    type="file"
+    accept="image/*"
+    onChange={handleImageChange}
+    className="w-full text-sm mt-1"
+  />
+  {imagePreview && (
+    <img
+      src={imagePreview}
+      alt="preview"
+      className="mt-2 w-full h-40 object-cover rounded"
+    />
+  )}
+</div>
           <div>
             <div className="flex justify-between items-center mb-2">
               <label className="text-sm text-gray-600">Variants</label>
@@ -392,6 +422,8 @@ function EditProductModal({ product, sellers, onClose, onSaved }: {
   onClose: () => void,
   onSaved: () => void
 }) {
+    const [imageFile, setImageFile] = useState<File | null>(null)
+const [imagePreview, setImagePreview] = useState<string>(product.image_url ?? '')
   const [name, setName] = useState(product.name)
   const [type, setType] = useState(product.type)
   const [sellerId, setSellerId] = useState(product.seller_id)
@@ -399,7 +431,12 @@ function EditProductModal({ product, sellers, onClose, onSaved }: {
   const [variants, setVariants] = useState<any[]>(product.product_variants ?? [])
   const [newVariants, setNewVariants] = useState<any[]>([])
   const [saving, setSaving] = useState(false)
-
+function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+  const file = e.target.files?.[0]
+  if (!file) return
+  setImageFile(file)
+  setImagePreview(URL.createObjectURL(file))
+}
   function addNewVariantRow() {
     setNewVariants([...newVariants, { name: '', price: '', stock: '' }])
   }
@@ -422,35 +459,41 @@ function EditProductModal({ product, sellers, onClose, onSaved }: {
   }
 
   async function handleSave() {
-    setSaving(true)
+  setSaving(true)
 
-    await supabase
-      .from('products')
-      .update({ name, type, seller_id: sellerId, description })
-      .eq('id', product.id)
-
-    for (const v of variants) {
-      await supabase
-        .from('product_variants')
-        .update({ name: v.name, price: Number(v.price), stock: Number(v.stock) })
-        .eq('id', v.id)
-    }
-
-    const validNew = newVariants.filter(v => v.name && v.price)
-    if (validNew.length > 0) {
-      await supabase.from('product_variants').insert(
-        validNew.map(v => ({
-          product_id: product.id,
-          name: v.name,
-          price: Number(v.price),
-          stock: Number(v.stock) || 0
-        }))
-      )
-    }
-
-    setSaving(false)
-    onSaved()
+  let imageUrl = product.image_url ?? ''
+  if (imageFile) {
+    const url = await uploadImage(imageFile)
+    if (url) imageUrl = url
   }
+
+  await supabase
+    .from('products')
+    .update({ name, type, seller_id: sellerId, description, image_url: imageUrl })
+    .eq('id', product.id)
+
+  for (const v of variants) {
+    await supabase
+      .from('product_variants')
+      .update({ name: v.name, price: Number(v.price), stock: Number(v.stock) })
+      .eq('id', v.id)
+  }
+
+  const validNew = newVariants.filter(v => v.name && v.price)
+  if (validNew.length > 0) {
+    await supabase.from('product_variants').insert(
+      validNew.map(v => ({
+        product_id: product.id,
+        name: v.name,
+        price: Number(v.price),
+        stock: Number(v.stock) || 0
+      }))
+    )
+  }
+
+  setSaving(false)
+  onSaved()
+}
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -502,7 +545,22 @@ function EditProductModal({ product, sellers, onClose, onSaved }: {
               rows={2}
             />
           </div>
-
+<div>
+  <label className="text-sm text-gray-600">รูปสินค้า</label>
+  <input
+    type="file"
+    accept="image/*"
+    onChange={handleImageChange}
+    className="w-full text-sm mt-1"
+  />
+  {imagePreview && (
+    <img
+      src={imagePreview}
+      alt="preview"
+      className="mt-2 w-full h-40 object-cover rounded"
+    />
+  )}
+</div>
           <div>
             <div className="flex justify-between items-center mb-2">
               <label className="text-sm text-gray-600">Variants</label>
