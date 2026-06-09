@@ -1,6 +1,5 @@
 'use client'
 
-import { useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
 
 const supabase = createClient(
@@ -9,49 +8,38 @@ const supabase = createClient(
 )
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+  async function loginWithGoogle() {
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: `${window.location.origin}/auth/callback` }
+    })
+  }
 
-  async function handleLogin() {
-    setLoading(true)
-    setError('')
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) {
-      setError('อีเมลหรือรหัสผ่านไม่ถูกต้อง')
-    } else {
-      window.location.href = '/admin'
-    }
-    setLoading(false)
+  async function loginWithDiscord() {
+    await supabase.auth.signInWithOAuth({
+      provider: 'discord',
+      options: { redirectTo: `${window.location.origin}/auth/callback` }
+    })
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-sm">
-        <h1 className="text-xl font-bold mb-6 text-center">เข้าสู่ระบบ</h1>
-        <div className="space-y-4">
-          <input
-            type="email"
-            placeholder="อีเมล"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            className="w-full border rounded px-3 py-2 text-sm"
-          />
-          <input
-            type="password"
-            placeholder="รหัสผ่าน"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            className="w-full border rounded px-3 py-2 text-sm"
-          />
-          {error && <p className="text-red-500 text-sm">{error}</p>}
+    <main className="min-h-screen bg-blue-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-sm p-8 w-full max-w-sm">
+        <h1 className="text-xl font-bold text-blue-900 mb-2 text-center">เข้าสู่ระบบ</h1>
+        <p className="text-sm text-gray-400 text-center mb-6">เพื่อสั่งซื้อสินค้า</p>
+        <div className="space-y-3">
           <button
-            onClick={handleLogin}
-            disabled={loading}
-            className="w-full bg-blue-500 text-white py-2 rounded text-sm hover:bg-blue-600 disabled:opacity-50"
+            onClick={loginWithGoogle}
+            className="w-full flex items-center justify-center gap-3 border rounded-lg py-2.5 text-sm hover:bg-gray-50"
           >
-            {loading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
+            <img src="https://www.google.com/favicon.ico" className="w-4 h-4" />
+            เข้าสู่ระบบด้วย Google
+          </button>
+          <button
+            onClick={loginWithDiscord}
+            className="w-full flex items-center justify-center gap-3 bg-indigo-600 text-white rounded-lg py-2.5 text-sm hover:bg-indigo-700"
+          >
+            เข้าสู่ระบบด้วย Discord
           </button>
         </div>
       </div>
