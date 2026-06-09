@@ -643,7 +643,28 @@ function ManageVendorsModal({ sellers, onClose, onSaved }: {
     }
     setInviting(false)
   }
+  async function handleDeleteVendor(sellerId: string) {
+  if (!confirm('ลบ vendor นี้จริงไหม?')) return
+  
+  // ลบ user_profiles ของ vendor นี้ก่อน
+  await supabase
+    .from('user_profiles')
+    .delete()
+    .eq('seller_id', sellerId)
 
+  // แล้วค่อยลบ seller
+  const { error } = await supabase
+    .from('sellers')
+    .delete()
+    .eq('id', sellerId)
+
+  if (error) {
+    setMessage('เกิดข้อผิดพลาด: ' + error.message)
+  } else {
+    setMessage('ลบ vendor สำเร็จ')
+    onSaved()
+  }
+}
   const vendors = sellers.filter(s => s.type === 'vendor')
 
   return (
@@ -687,8 +708,15 @@ function ManageVendorsModal({ sellers, onClose, onSaved }: {
               {vendors.map(v => (
                 <div key={v.id} className="border rounded p-3">
                   <p className="text-sm font-medium">{v.name}</p>
-                  <p className="text-xs text-gray-400 mb-2">{v.contact_url}</p>
-                  <div className="flex gap-2">
+<div className="flex justify-between items-center mb-2">
+  <p className="text-xs text-gray-400">{v.contact_url}</p>
+  <button
+    onClick={() => handleDeleteVendor(v.id)}
+    className="text-xs text-red-400 hover:text-red-600"
+  >
+    ลบ
+  </button>
+</div>                  <div className="flex gap-2">
                     <input
                       placeholder="อีเมล vendor"
                       value={email}
