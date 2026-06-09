@@ -39,19 +39,19 @@ export default async function CatalogPage() {
       <header className="bg-white border-b border-blue-100 shadow-sm">
   <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
     <div className="flex items-center gap-3">
-      <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
-        <span className="text-white text-sm font-bold">D</span>
+        <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
+          <span className="text-white text-sm font-bold">D</span>
+        </div>
+        <h1 className="text-lg font-bold text-blue-900">DMT Shop</h1>
       </div>
-      <h1 className="text-lg font-bold text-blue-900">DMT Shop</h1>
+      <a
+        href="/login"
+        className="text-sm bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
+      >
+        เข้าสู่ระบบ
+      </a>
     </div>
-    
-      href="/login"
-      className="text-sm bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
-    >
-      เข้าสู่ระบบ
-    </a>
-  </div>
-</header>
+  </header>
       <div className="max-w-5xl mx-auto px-4 py-8">
         <Section title="สินค้ากลุ่ม" subtitle="กึ่งออฟฟิเชียล" products={official} color="blue" />
         <Section title="สินค้าแอดมิน" subtitle="ของแอดมิน" products={admin} color="sky" />
