@@ -48,6 +48,13 @@ async function handleDelete(productId: string) {
   await supabase.from('products').delete().eq('id', productId)
   loadProducts()
 }
+async function handleToggleAvailable(productId: string, current: boolean) {
+  await supabase
+    .from('products')
+    .update({ is_available: !current })
+    .eq('id', productId)
+  loadProducts()
+}
   async function handleLogout() {
     await supabase.auth.signOut()
     window.location.href = '/login'
@@ -711,11 +718,4 @@ function ManageVendorsModal({ sellers, onClose, onSaved }: {
       </div>
     </div>
   )
-}
-async function handleToggleAvailable(productId: string, current: boolean) {
-  await supabase
-    .from('products')
-    .update({ is_available: !current })
-    .eq('id', productId)
-  loadProducts()
 }
