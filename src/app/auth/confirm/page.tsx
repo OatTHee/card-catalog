@@ -10,10 +10,7 @@ const supabase = createClient(
 
 export default function ConfirmPage() {
   useEffect(() => {
-    async function confirm() {
-      // รอให้ Supabase จัดการ hash fragment ก่อน
-      const { data: { session } } = await supabase.auth.getSession()
-      
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         await supabase.from('customers').upsert({
           id: session.user.id,
@@ -22,12 +19,20 @@ export default function ConfirmPage() {
           avatar_url: session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture
         }, { onConflict: 'id' })
         window.location.href = '/catalog'
-        return
+      } else if (event === 'SIGNED_OUT') {
+        window.location.href = '/login?error=auth'
       }
+    })
 
+    // timeout fallback
+    const timeout = setTimeout(() => {
       window.location.href = '/login?error=auth'
+    }, 5000)
+
+    return () => {
+      subscription.unsubscribe()
+      clearTimeout(timeout)
     }
-    confirm()
   }, [])
 
   return (
