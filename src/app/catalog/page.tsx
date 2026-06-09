@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-
+export const revalidate = 0
 async function getProducts() {
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL || '',
