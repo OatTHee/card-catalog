@@ -129,7 +129,7 @@ function ProductCard({ product }: { product: any }) {
         </div>
 
         {isAvailable ? (
-          
+          <a
             href={product.sellers?.contact_url}
             target="_blank"
             rel="noopener noreferrer"
