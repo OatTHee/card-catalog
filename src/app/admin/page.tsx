@@ -265,13 +265,13 @@ function AddProductModal({ sellers, onClose, onSaved }: {
   onClose: () => void,
   onSaved: () => void
 }) {
-    const [imageFile, setImageFile] = useState<File | null>(null)
-const [imagePreview, setImagePreview] = useState<string>('')
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string>('')
   const [name, setName] = useState('')
   const [type, setType] = useState('set')
   const [sellerId, setSellerId] = useState(sellers[0]?.id ?? '')
   const [description, setDescription] = useState('')
-  const [variants, setVariants] = useState([{ name: '', price: '', stock: '' }])
+  const [variants, setVariants] = useState([{ name: '', price: '', stock: '', image_url: '', imageFile: null as File | null }])
   const [saving, setSaving] = useState(false)
 
   function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -289,11 +289,11 @@ const [imagePreview, setImagePreview] = useState<string>('')
     setVariants(variants.filter((_, i) => i !== index))
   }
 
-  function updateVariant(index: number, field: string, value: string) {
-    const updated = [...variants]
-    updated[index] = { ...updated[index], [field]: value }
-    setVariants(updated)
-  }
+  function updateVariant(index: number, field: string, value: any) {
+  const updated = [...variants]
+  updated[index] = { ...updated[index], [field]: value }
+  setVariants(updated)
+}
 
   async function handleSave() {
   if (!name || !sellerId) return
@@ -318,17 +318,22 @@ const [imagePreview, setImagePreview] = useState<string>('')
   }
 
   const validVariants = variants.filter(v => v.name && v.price)
-  if (validVariants.length > 0) {
-    await supabase.from('product_variants').insert(
-      validVariants.map(v => ({
-        product_id: product.id,
-        name: v.name,
-        price: Number(v.price),
-        stock: Number(v.stock) || 0
-      }))
-    )
+if (validVariants.length > 0) {
+  for (const v of validVariants) {
+    let imageUrl = ''
+    if (v.imageFile) {
+      const url = await uploadImage(v.imageFile)
+      if (url) imageUrl = url
+    }
+    await supabase.from('product_variants').insert({
+      product_id: product.id,
+      name: v.name,
+      price: Number(v.price),
+      stock: Number(v.stock) || 0,
+      image_url: imageUrl
+    })
   }
-
+}
   setSaving(false)
   onSaved()
 }
@@ -411,37 +416,48 @@ const [imagePreview, setImagePreview] = useState<string>('')
               </button>
             </div>
             {variants.map((v, i) => (
-              <div key={i} className="flex gap-2 mb-2">
-                <input
-                  value={v.name}
-                  onChange={e => updateVariant(i, 'name', e.target.value)}
-                  placeholder="ชื่อ"
-                  className="flex-1 border rounded px-2 py-1 text-sm"
-                />
-                <input
-                  value={v.price}
-                  onChange={e => updateVariant(i, 'price', e.target.value)}
-                  placeholder="ราคา"
-                  type="number"
-                  className="w-20 border rounded px-2 py-1 text-sm"
-                />
-                <input
-                  value={v.stock}
-                  onChange={e => updateVariant(i, 'stock', e.target.value)}
-                  placeholder="สต็อก"
-                  type="number"
-                  className="w-20 border rounded px-2 py-1 text-sm"
-                />
-                {variants.length > 1 && (
-                  <button
-                    onClick={() => removeVariantRow(i)}
-                    className="text-red-400 hover:text-red-600 text-sm"
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
-            ))}
+  <div key={i} className="border rounded-lg p-2 mb-2 space-y-2">
+    <div className="flex gap-2">
+      <input
+        value={v.name}
+        onChange={e => updateVariant(i, 'name', e.target.value)}
+        placeholder="ชื่อ"
+        className="flex-1 border rounded px-2 py-1 text-sm"
+      />
+      <input
+        value={v.price}
+        onChange={e => updateVariant(i, 'price', e.target.value)}
+        placeholder="ราคา"
+        type="number"
+        className="w-20 border rounded px-2 py-1 text-sm"
+      />
+      <input
+        value={v.stock}
+        onChange={e => updateVariant(i, 'stock', e.target.value)}
+        placeholder="สต็อก"
+        type="number"
+        className="w-20 border rounded px-2 py-1 text-sm"
+      />
+      {variants.length > 1 && (
+        <button onClick={() => removeVariantRow(i)} className="text-red-400 text-sm">✕</button>
+      )}
+    </div>
+    <div>
+      <input
+        type="file"
+        accept="image/*"
+        onChange={e => {
+          const file = e.target.files?.[0]
+          if (file) updateVariant(i, 'imageFile', file)
+        }}
+        className="w-full text-xs"
+      />
+      {v.imageFile && (
+        <img src={URL.createObjectURL(v.imageFile)} className="mt-1 h-16 object-cover rounded" />
+      )}
+    </div>
+  </div>
+))}
           </div>
         </div>
 
@@ -521,11 +537,10 @@ function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     .eq('id', product.id)
 
   for (const v of variants) {
-    await supabase
-      .from('product_variants')
-      .update({ name: v.name, price: Number(v.price), stock: Number(v.stock) })
-      .eq('id', v.id)
-  }
+  await supabase.from('product_variants')
+    .update({ name: v.name, price: Number(v.price), stock: Number(v.stock), image_url: v.image_url })
+    .eq('id', v.id)
+}
 
   const validNew = newVariants.filter(v => v.name && v.price)
   if (validNew.length > 0) {
@@ -621,36 +636,32 @@ function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
             </div>
 
             {variants.map((v, i) => (
-              <div key={v.id} className="flex gap-2 mb-2">
-                <input
-                  value={v.name}
-                  onChange={e => updateExistingVariant(i, 'name', e.target.value)}
-                  placeholder="ชื่อ"
-                  className="flex-1 border rounded px-2 py-1 text-sm"
-                />
-                <input
-                  value={v.price}
-                  onChange={e => updateExistingVariant(i, 'price', e.target.value)}
-                  type="number"
-                  placeholder="ราคา"
-                  className="w-20 border rounded px-2 py-1 text-sm"
-                />
-                <input
-                  value={v.stock}
-                  onChange={e => updateExistingVariant(i, 'stock', e.target.value)}
-                  type="number"
-                  placeholder="สต็อก"
-                  className="w-20 border rounded px-2 py-1 text-sm"
-                />
-                <button
-                  onClick={() => handleDeleteVariant(v.id)}
-                  className="text-red-400 hover:text-red-600 text-sm"
-                >
-                  ✕
-                </button>
-              </div>
-            ))}
-
+  <div key={v.id} className="border rounded-lg p-2 mb-2 space-y-2">
+    <div className="flex gap-2">
+      <input value={v.name} onChange={e => updateExistingVariant(i, 'name', e.target.value)}
+        placeholder="ชื่อ" className="flex-1 border rounded px-2 py-1 text-sm" />
+      <input value={v.price} onChange={e => updateExistingVariant(i, 'price', e.target.value)}
+        type="number" placeholder="ราคา" className="w-20 border rounded px-2 py-1 text-sm" />
+      <input value={v.stock} onChange={e => updateExistingVariant(i, 'stock', e.target.value)}
+        type="number" placeholder="สต็อก" className="w-20 border rounded px-2 py-1 text-sm" />
+      <button onClick={() => handleDeleteVariant(v.id)} className="text-red-400 text-sm">✕</button>
+    </div>
+    <div>
+      {v.image_url && <img src={v.image_url} className="h-16 object-cover rounded mb-1" />}
+      <input
+        type="file"
+        accept="image/*"
+        onChange={async e => {
+          const file = e.target.files?.[0]
+          if (!file) return
+          const url = await uploadImage(file)
+          if (url) updateExistingVariant(i, 'image_url', url)
+        }}
+        className="w-full text-xs"
+      />
+    </div>
+  </div>
+))}
             {newVariants.map((v, i) => (
               <div key={i} className="flex gap-2 mb-2">
                 <input

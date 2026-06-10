@@ -12,7 +12,7 @@ export default function ProductCard({ product }: { product: any }) {
   const selectedVariant = variants.find((v: any) => v.id === selectedVariantId) ?? variants[0]
   const totalStock = variants.reduce((sum: number, v: any) => sum + v.stock, 0)
   const isAvailable = totalStock > 0
-
+  const displayImage = selectedVariant?.image_url || product.image_url
   function handleAddToCart() {
     if (!selectedVariant) return
     addToCart({
@@ -32,7 +32,7 @@ export default function ProductCard({ product }: { product: any }) {
     <div className="bg-white rounded-xl shadow-sm border border-blue-50 overflow-hidden hover:shadow-md transition-shadow">
       <div className="w-full h-40 bg-blue-50 flex items-center justify-center overflow-hidden">
         {product.image_url ? (
-          <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+          <img src={displayImage} alt={product.name} className="w-full h-full object-cover" />
         ) : (
           <span className="text-blue-200 text-4xl">🃏</span>
         )}
