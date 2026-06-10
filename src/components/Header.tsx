@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
+import { getCartCount } from '@/lib/cart'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -10,6 +11,7 @@ const supabase = createClient(
 
 export default function Header() {
   const [user, setUser] = useState<any>(null)
+  const [cartCount, setCartCount] = useState(0)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -18,22 +20,38 @@ export default function Header() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
       setUser(session?.user ?? null)
     })
-    return () => subscription.unsubscribe()
+
+    setCartCount(getCartCount())
+
+    const handleStorage = () => setCartCount(getCartCount())
+    window.addEventListener('storage', handleStorage)
+
+    return () => {
+      subscription.unsubscribe()
+      window.removeEventListener('storage', handleStorage)
+    }
   }, [])
 
   return (
     <header className="bg-white border-b border-blue-100 shadow-sm">
       <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
+        <a href="/catalog" className="flex items-center gap-3">
           <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
             <span className="text-white text-sm font-bold">D</span>
           </div>
           <h1 className="text-lg font-bold text-blue-900">DMT Shop</h1>
-        </div>
+        </a>
         <div className="flex items-center gap-3">
           {user ? (
             <>
-              <a href="/cart" className="text-sm text-gray-600 hover:text-blue-500">🛒 ตะกร้า</a>
+              <a href="/cart" className="relative text-gray-600 hover:text-blue-500">
+                <span className="text-xl">🛒</span>
+                {cartCount > 0 && (
+                  <span className="absolute -top-1 -right-2 bg-blue-500 text-white text-xs w-4 h-4 rounded-full flex items-center justify-center">
+                    {cartCount}
+                  </span>
+                )}
+              </a>
               <a href="/orders" className="text-sm text-gray-600 hover:text-blue-500">คำสั่งซื้อ</a>
               <a href="/profile">
                 <img
