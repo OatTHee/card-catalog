@@ -282,7 +282,7 @@ function AddProductModal({ sellers, onClose, onSaved }: {
 }
 
   function addVariantRow() {
-    setVariants([...variants, { name: '', price: '', stock: '' }])
+    setVariants([...variants, { name: '', price: '', stock: '', image_url: '', imageFile: null }])
   }
 
   function removeVariantRow(index: number) {
