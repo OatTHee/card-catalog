@@ -49,7 +49,31 @@ if (settings) setShippingFee(settings.value)
 }
 async function handleDelete(productId: string) {
   if (!confirm('ลบสินค้านี้จริงไหม?')) return
-  await supabase.from('products').delete().eq('id', productId)
+
+  // ดึง variants ก่อน
+  const { data: variants } = await supabase
+    .from('product_variants')
+    .select('id')
+    .eq('product_id', productId)
+
+  const variantIds = (variants ?? []).map(v => v.id)
+
+  // ลบ set_items
+  if (variantIds.length > 0) {
+    await supabase.from('set_items').delete().in('variant_id', variantIds)
+  }
+
+  // ลบ variants
+  await supabase.from('product_variants').delete().eq('product_id', productId)
+
+  // ลบ product
+  const { error } = await supabase.from('products').delete().eq('id', productId)
+
+  if (error) {
+    alert('ลบไม่ได้ เนื่องจากมี order ที่เคยสั่งซื้อสินค้านี้อยู่\nแนะนำให้ซ่อนสินค้าแทนครับ')
+    return
+  }
+
   loadProducts()
 }
 async function handleToggleAvailable(productId: string, current: boolean) {
