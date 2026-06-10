@@ -4,26 +4,23 @@ import { addToCart } from '@/lib/cart'
 import { useState } from 'react'
 
 export default function ProductCard({ product }: { product: any }) {
+  const [selectedVariantId, setSelectedVariantId] = useState(product.product_variants?.[0]?.id ?? '')
   const [added, setAdded] = useState(false)
 
   const isOfficial = product.sellers?.type === 'official'
-  const minPrice = product.product_variants?.length > 0
-    ? Math.min(...product.product_variants.map((v: any) => v.price))
-    : null
-  const totalStock = product.product_variants?.reduce(
-    (sum: number, v: any) => sum + v.stock, 0
-  ) ?? 0
+  const variants = product.product_variants ?? []
+  const selectedVariant = variants.find((v: any) => v.id === selectedVariantId) ?? variants[0]
+  const totalStock = variants.reduce((sum: number, v: any) => sum + v.stock, 0)
   const isAvailable = totalStock > 0
-  const firstVariant = product.product_variants?.[0]
 
   function handleAddToCart() {
-    if (!firstVariant) return
+    if (!selectedVariant) return
     addToCart({
-      variantId: firstVariant.id,
+      variantId: selectedVariant.id,
       productId: product.id,
       productName: product.name,
-      variantName: firstVariant.name,
-      price: firstVariant.price,
+      variantName: selectedVariant.name,
+      price: selectedVariant.price,
       quantity: 1,
       imageUrl: product.image_url
     })
@@ -45,29 +42,45 @@ export default function ProductCard({ product }: { product: any }) {
           {product.type === 'set' ? 'เซ็ต' : product.type === 'single' ? 'การ์ดแยกใบ' : 'อุปกรณ์เสริม'}
         </p>
         <h3 className="font-semibold text-sm text-gray-800 leading-tight mb-1">{product.name}</h3>
+
+        {isOfficial && variants.length > 1 && (
+          <select
+            value={selectedVariantId}
+            onChange={e => setSelectedVariantId(e.target.value)}
+            className="w-full border rounded-lg px-2 py-1 text-xs mt-1 text-gray-600"
+          >
+            {variants.map((v: any) => (
+              <option key={v.id} value={v.id} disabled={v.stock === 0}>
+                {v.name} — ฿{v.price} {v.stock === 0 ? '(หมด)' : `(เหลือ ${v.stock})`}
+              </option>
+            ))}
+          </select>
+        )}
+
         <div className="flex items-center justify-between mt-2">
-          {minPrice ? (
-            <span className="text-blue-600 font-bold text-sm">฿{minPrice}</span>
-          ) : (
-            <span className="text-gray-300 text-sm">-</span>
-          )}
+          <span className="text-blue-600 font-bold text-sm">
+            {selectedVariant ? `฿${selectedVariant.price}` : '-'}
+          </span>
           <span className={`text-xs px-2 py-0.5 rounded-full ${isAvailable ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
-            {isAvailable ? `เหลือ ${totalStock}` : 'หมด'}
+            {isAvailable ? `เหลือ ${selectedVariant?.stock ?? 0}` : 'หมด'}
           </span>
         </div>
 
         {!isAvailable ? (
-          <button disabled className="mt-3 w-full text-center text-sm py-1.5 rounded-lg bg-gray-100 text-gray-400 cursor-not-allowed">
+          <button disabled className="mt-3 w-full text-sm py-1.5 rounded-lg bg-gray-100 text-gray-400 cursor-not-allowed">
             หมดแล้ว
           </button>
         ) : isOfficial ? (
-          <button onClick={handleAddToCart}
-            className={`mt-3 w-full text-center text-sm py-1.5 rounded-lg font-medium transition-colors ${added ? 'bg-green-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}>
+          <button
+            onClick={handleAddToCart}
+            disabled={selectedVariant?.stock === 0}
+            className={`mt-3 w-full text-sm py-1.5 rounded-lg font-medium transition-colors ${added ? 'bg-green-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
+          >
             {added ? '✓ เพิ่มแล้ว' : '+ ใส่ตะกร้า'}
           </button>
         ) : (
           <a href={product.sellers?.contact_url} target="_blank" rel="noopener noreferrer"
-            className="mt-3 block text-center text-sm py-1.5 rounded-lg bg-slate-500 text-white hover:bg-slate-600 transition-colors font-medium">
+            className="mt-3 block text-center text-sm py-1.5 rounded-lg bg-slate-500 text-white hover:bg-slate-600 font-medium">
             ติดต่อซื้อ
           </a>
         )}
