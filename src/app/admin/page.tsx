@@ -2,7 +2,6 @@
 import { uploadImage } from '@/lib/upload'
 import { useEffect, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
-const [shippingFee, setShippingFee] = useState('')
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
@@ -12,10 +11,10 @@ export default function AdminPage() {
     const [showManageVendors, setShowManageVendors] = useState(false)
     const [editProduct, setEditProduct] = useState<any>(null)
     const [sellers, setSellers] = useState<any[]>([])
-const [showAddProduct, setShowAddProduct] = useState(false)
-  const [products, setProducts] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-
+    const [showAddProduct, setShowAddProduct] = useState(false)
+    const [products, setProducts] = useState<any[]>([])
+    const [loading, setLoading] = useState(true)
+    const [shippingFee, setShippingFee] = useState('')
   useEffect(() => {
     checkAuthAndLoad()
   }, [])
