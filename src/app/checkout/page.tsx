@@ -20,6 +20,7 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [session, setSession] = useState<any>(null)
+  const [showQR, setShowQR] = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -35,7 +36,7 @@ export default function CheckoutPage() {
       supabase.from('settings').select('value').eq('key', 'shipping_fee').single()
     ])
     setAddresses(addrs ?? [])
-    if (addrs?.length) setSelectedAddress(addrs.find(a => a.is_default)?.id || addrs[0].id)
+    if (addrs?.length) setSelectedAddress(addrs.find((a: any) => a.is_default)?.id || addrs[0].id)
     if (settings) setShippingFee(Number(settings.value))
     setCart(getCart())
     setLoading(false)
@@ -52,7 +53,6 @@ export default function CheckoutPage() {
     if (!selectedAddress || !slipFile || cart.length === 0) return
     setSubmitting(true)
 
-    // เช็ค stock ก่อน
     for (const item of cart) {
       const { data: variant } = await supabase
         .from('product_variants').select('stock, name').eq('id', item.variantId).single()
@@ -63,14 +63,12 @@ export default function CheckoutPage() {
       }
     }
 
-    // อัปโหลดสลิป
     const ext = slipFile.name.split('.').pop()
     const fileName = `slips/${Date.now()}.${ext}`
     const { error: uploadError } = await supabase.storage.from('products').upload(fileName, slipFile)
     if (uploadError) { alert('อัปโหลดสลิปไม่สำเร็จ'); setSubmitting(false); return }
     const { data: slipData } = supabase.storage.from('products').getPublicUrl(fileName)
 
-    // สร้าง order
     const subtotal = cart.reduce((sum, i) => sum + i.price * i.quantity, 0)
     const { data: order, error: orderError } = await supabase.from('orders').insert({
       customer_id: session.user.id,
@@ -84,7 +82,6 @@ export default function CheckoutPage() {
 
     if (orderError || !order) { alert('เกิดข้อผิดพลาด'); setSubmitting(false); return }
 
-    // เพิ่ม order items และตัด stock
     for (const item of cart) {
       await supabase.from('order_items').insert({
         order_id: order.id,
@@ -93,10 +90,7 @@ export default function CheckoutPage() {
         price: item.price,
         quantity: item.quantity
       })
-      await supabase.rpc('decrement_stock', {
-  variant_id: item.variantId,
-  amount: item.quantity
-})
+      await supabase.rpc('decrement_stock', { variant_id: item.variantId, amount: item.quantity })
     }
 
     clearCart()
@@ -159,20 +153,29 @@ export default function CheckoutPage() {
           </div>
         </div>
 
-        
-  </div>
-  {/* อัปโหลดสลิป */}
+        {/* ชำระเงิน */}
         <div className="bg-white rounded-xl shadow-sm p-4">
-  <h3 className="font-semibold text-gray-800 mb-3">ชำระเงิน</h3>
-  <div className="bg-blue-900/30 border border-blue-500/50 p-5 rounded-xl text-center mb-4">
-    <img src="https://i.postimg.cc/RV9Z9KJh/004999184266566-20250920-153316.jpg"
-      className="w-64 mx-auto mb-4 rounded-xl shadow-lg border-2 border-white/20" />
-    <div className="text-left text-sm bg-white text-black p-4 rounded-xl mx-auto max-w-sm font-bold shadow-inner">
-      <p className="mb-2 text-base">🏦 <b>กสิกร:</b> 8450260981 (ศรัณย์)</p>
-      <p className="text-base">📱 <b>Wallet:</b> 094-7066766 (ศรัณย์)</p>
-    </div>
-  </div>
-  <p className="text-xs text-gray-400 mb-3">โอนเงิน ฿{subtotal + shippingFee} แล้วแนบสลิปด้านล่าง</p>
+          <h3 className="font-semibold text-gray-800 mb-3">ชำระเงิน</h3>
+          <div className="bg-blue-900/30 border border-blue-500/50 p-5 rounded-xl text-center mb-4">
+            <img
+              src="https://i.postimg.cc/RV9Z9KJh/004999184266566-20250920-153316.jpg"
+              className="w-64 mx-auto mb-4 rounded-xl shadow-lg border-2 border-white/20 cursor-pointer hover:opacity-90"
+              onClick={() => setShowQR(true)}
+            />
+            <p className="text-xs text-blue-200 mb-3">กดรูปเพื่อขยาย</p>
+            <div className="text-left text-sm bg-white text-black p-4 rounded-xl mx-auto max-w-sm font-bold shadow-inner">
+              <p className="mb-2 text-base">🏦 <b>กสิกร:</b> 8450260981 (ศรัณย์)</p>
+              <p className="text-base">📱 <b>Wallet:</b> 094-7066766 (ศรัณย์)</p>
+            </div>
+          </div>
+          <p className="text-sm font-medium text-blue-900 mb-3">โอนเงิน ฿{subtotal + shippingFee} แล้วแนบสลิปด้านล่าง</p>
+
+          {/* อัปโหลดสลิป */}
+          <input type="file" accept="image/*" onChange={handleSlipChange} className="w-full text-sm mb-3" />
+          {slipPreview && (
+            <img src={slipPreview} className="w-full max-h-48 object-contain rounded-lg border mb-3" />
+          )}
+        </div>
 
         <button
           onClick={handleSubmit}
@@ -182,6 +185,19 @@ export default function CheckoutPage() {
           {submitting ? 'กำลังดำเนินการ...' : 'ยืนยันคำสั่งซื้อ'}
         </button>
       </div>
+
+      {/* QR Fullscreen */}
+      {showQR && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowQR(false)}
+        >
+          <img
+            src="https://i.postimg.cc/RV9Z9KJh/004999184266566-20250920-153316.jpg"
+            className="max-w-sm w-full rounded-xl"
+          />
+        </div>
+      )}
     </main>
   )
 }
