@@ -19,14 +19,23 @@ export default function AdminPage() {
     checkAuthAndLoad()
   }, [])
 
-  async function checkAuthAndLoad() {
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
-      window.location.href = '/login'
-      return
-    }
-    loadProducts()
+async function checkAuthAndLoad() {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) { window.location.href = '/login'; return }
+
+  const { data: profile } = await supabase
+    .from('user_profiles')
+    .select('role')
+    .eq('id', session.user.id)
+    .single()
+
+  if (!profile || profile.role !== 'admin') {
+    window.location.href = '/catalog'
+    return
   }
+
+  loadProducts()
+}
   async function handleUpdateShipping() {
   await supabase.from('settings').update({ value: shippingFee }).eq('key', 'shipping_fee')
   alert('บันทึกแล้ว')
