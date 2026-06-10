@@ -159,15 +159,20 @@ export default function CheckoutPage() {
           </div>
         </div>
 
-        {/* อัปโหลดสลิป */}
+        
+  </div>
+  {/* อัปโหลดสลิป */}
         <div className="bg-white rounded-xl shadow-sm p-4">
-          <h3 className="font-semibold text-gray-800 mb-1">ชำระเงิน</h3>
-          <p className="text-xs text-gray-400 mb-3">โอนเงิน ฿{subtotal + shippingFee} แล้วแนบสลิปด้านล่าง</p>
-          <input type="file" accept="image/*" onChange={handleSlipChange} className="w-full text-sm" />
-          {slipPreview && (
-            <img src={slipPreview} className="mt-3 w-full max-h-48 object-contain rounded-lg border" />
-          )}
-        </div>
+  <h3 className="font-semibold text-gray-800 mb-3">ชำระเงิน</h3>
+  <div className="bg-blue-900/30 border border-blue-500/50 p-5 rounded-xl text-center mb-4">
+    <img src="https://i.postimg.cc/RV9Z9KJh/004999184266566-20250920-153316.jpg"
+      className="w-64 mx-auto mb-4 rounded-xl shadow-lg border-2 border-white/20" />
+    <div className="text-left text-sm bg-white text-black p-4 rounded-xl mx-auto max-w-sm font-bold shadow-inner">
+      <p className="mb-2 text-base">🏦 <b>กสิกร:</b> 8450260981 (ศรัณย์)</p>
+      <p className="text-base">📱 <b>Wallet:</b> 094-7066766 (ศรัณย์)</p>
+    </div>
+  </div>
+  <p className="text-xs text-gray-400 mb-3">โอนเงิน ฿{subtotal + shippingFee} แล้วแนบสลิปด้านล่าง</p>
 
         <button
           onClick={handleSubmit}
