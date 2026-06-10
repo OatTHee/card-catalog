@@ -2,7 +2,7 @@
 import { uploadImage } from '@/lib/upload'
 import { useEffect, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
-
+const [shippingFee, setShippingFee] = useState('')
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
@@ -28,8 +28,13 @@ const [showAddProduct, setShowAddProduct] = useState(false)
     }
     loadProducts()
   }
-
+  async function handleUpdateShipping() {
+  await supabase.from('settings').update({ value: shippingFee }).eq('key', 'shipping_fee')
+  alert('บันทึกแล้ว')
+}
   async function loadProducts() {
+    const { data: settings } = await supabase.from('settings').select('value').eq('key', 'shipping_fee').single()
+if (settings) setShippingFee(settings.value)
   const { data: productsData } = await supabase
     .from('products')
     .select('*, sellers(*), product_variants(*)')
@@ -79,6 +84,10 @@ async function handleToggleAvailable(productId: string, current: boolean) {
 >
   จัดการ Vendor
 </button>
+<a href="/admin/orders"
+  className="text-sm bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+  จัดการ Order
+</a>
     <button
       onClick={handleLogout}
       className="text-sm text-gray-500 hover:text-red-500"
@@ -166,6 +175,22 @@ async function handleToggleAvailable(productId: string, current: boolean) {
     onSaved={loadProducts}
   />
 )}
+<div className="mt-8 bg-white rounded-lg p-4 border">
+  <h2 className="font-semibold mb-3">ตั้งค่าค่าส่ง</h2>
+  <div className="flex gap-2 items-center">
+    <input
+      value={shippingFee}
+      onChange={e => setShippingFee(e.target.value)}
+      type="number"
+      className="border rounded px-3 py-2 text-sm w-32"
+    />
+    <span className="text-sm text-gray-500">บาท</span>
+    <button onClick={handleUpdateShipping}
+      className="text-sm bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+      บันทึก
+    </button>
+  </div>
+</div>
     </main>
   )
 }
