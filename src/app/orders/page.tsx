@@ -29,11 +29,14 @@ export default function OrdersPage() {
   }, [])
 
   async function loadOrders(userId: string) {
-    const { data } = await supabase.from('orders').select('*')
-      .eq('customer_id', userId).order('created_at', { ascending: false })
-    setOrders(data ?? [])
-    setLoading(false)
-  }
+  const { data: ordersData } = await supabase
+    .from('orders')
+    .select('*, order_items(*)')
+    .eq('customer_id', userId)
+    .order('created_at', { ascending: false })
+  setOrders(ordersData ?? [])
+  setLoading(false)
+}
 
   if (loading) return <div className="min-h-screen bg-blue-50 flex items-center justify-center">กำลังโหลด...</div>
 
@@ -50,21 +53,46 @@ export default function OrdersPage() {
         ) : (
           <div className="space-y-3">
             {orders.map(order => {
-              const s = statusLabel[order.status]
-              return (
-                <a key={order.id} href={`/orders/${order.id}`}
-                  className="bg-white rounded-xl shadow-sm p-4 flex justify-between items-center hover:shadow-md transition-shadow block">
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">คำสั่งซื้อ #{order.id.slice(0, 8)}</p>
-                    <p className="text-xs text-gray-400">{new Date(order.created_at).toLocaleDateString('th-TH')}</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="font-bold text-blue-600">฿{order.total}</span>
-                    <span className={`text-xs px-2 py-1 rounded-full ${s.color}`}>{s.label}</span>
-                  </div>
-                </a>
-              )
-            })}
+  const s = statusLabel[order.status]
+  return (
+    <div key={order.id} className="bg-white rounded-xl shadow-sm p-4 space-y-3">
+      <div className="flex justify-between items-start">
+        <div>
+          <p className="text-sm font-medium text-gray-800">คำสั่งซื้อ #{order.id.slice(0, 8)}</p>
+          <p className="text-xs text-gray-400">{new Date(order.created_at).toLocaleDateString('th-TH')}</p>
+        </div>
+        <span className={`text-xs px-2 py-1 rounded-full ${s.color}`}>{s.label}</span>
+      </div>
+
+      {/* รายการสินค้า */}
+      <div className="space-y-1 border-t pt-3">
+        {order.order_items?.map((item: any) => (
+          <div key={item.id} className="flex justify-between text-sm">
+            <span className="text-gray-600">{item.name} x{item.quantity}</span>
+            <span className="text-gray-800">฿{item.price * item.quantity}</span>
+          </div>
+        ))}
+        <div className="flex justify-between text-xs text-gray-400 pt-1">
+          <span>ค่าส่ง</span>
+          <span>฿{order.shipping_fee}</span>
+        </div>
+        <div className="flex justify-between font-bold text-blue-900 border-t pt-1">
+          <span>รวม</span>
+          <span>฿{order.total}</span>
+        </div>
+      </div>
+
+      {/* เลขพัสดุ */}
+      {order.tracking_number && (
+        <div className="bg-blue-50 rounded-lg p-3">
+          <p className="text-xs text-gray-500 mb-1">เลขพัสดุ</p>
+          <p className="font-bold text-blue-700 text-lg">{order.tracking_number}</p>
+          <p className="text-xs text-gray-400 mt-1">นำเลขนี้ไปเช็คที่เว็บขนส่งได้เลยครับ</p>
+        </div>
+      )}
+    </div>
+  )
+})}
           </div>
         )}
       </div>

@@ -22,22 +22,10 @@ export default function AdminOrdersPage() {
   const [selectedOrder, setSelectedOrder] = useState<any>(null)
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-  if (!session) { window.location.href = '/login'; return }
-
-  const { data: profile } = await supabase
-    .from('user_profiles')
-    .select('role')
-    .eq('id', session.user.id)
-    .single()
-
-  if (!profile || profile.role !== 'admin') {
-    window.location.href = '/catalog'
-    return
-  }
-
-  loadOrders()
-})
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) { window.location.href = '/login'; return }
+      loadOrders()
+    })
   }, [])
 
   async function loadOrders() {
