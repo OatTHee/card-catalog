@@ -4,15 +4,66 @@ import { addToCart } from '@/lib/cart'
 import { useState } from 'react'
 
 export default function ProductCard({ product }: { product: any }) {
-  const [selectedVariantId, setSelectedVariantId] = useState(product.product_variants?.[0]?.id ?? '')
-  const [added, setAdded] = useState(false)
+  const [showModal, setShowModal] = useState(false)
 
   const isOfficial = product.sellers?.type === 'official'
   const variants = product.product_variants ?? []
-  const selectedVariant = variants.find((v: any) => v.id === selectedVariantId) ?? variants[0]
   const totalStock = variants.reduce((sum: number, v: any) => sum + v.stock, 0)
   const isAvailable = totalStock > 0
+  const minPrice = variants.length > 0 ? Math.min(...variants.map((v: any) => v.price)) : null
+
+  return (
+    <>
+      <div
+        onClick={() => setShowModal(true)}
+        className="bg-white rounded-xl shadow-sm border border-blue-50 overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all cursor-pointer"
+      >
+        <div className="w-full h-40 bg-blue-50 flex items-center justify-center overflow-hidden">
+          {product.image_url ? (
+            <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+          ) : (
+            <span className="text-blue-200 text-4xl">🃏</span>
+          )}
+        </div>
+        <div className="p-3">
+          <p className="text-xs text-blue-400 mb-0.5">
+            {product.type === 'set' ? 'เซ็ต' : product.type === 'single' ? 'การ์ดแยกใบ' : 'อุปกรณ์เสริม'}
+          </p>
+          <h3 className="font-semibold text-sm text-gray-800 leading-tight mb-1">{product.name}</h3>
+          <div className="flex items-center justify-between mt-2">
+            <span className="text-blue-600 font-bold text-sm">{minPrice ? `฿${minPrice}` : '-'}</span>
+            <span className={`text-xs px-2 py-0.5 rounded-full ${isAvailable ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
+              {isAvailable ? `เหลือ ${totalStock}` : 'หมด'}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {showModal && (
+        <ProductModal
+          product={product}
+          isOfficial={isOfficial}
+          variants={variants}
+          onClose={() => setShowModal(false)}
+        />
+      )}
+    </>
+  )
+}
+
+function ProductModal({ product, isOfficial, variants, onClose }: {
+  product: any
+  isOfficial: boolean
+  variants: any[]
+  onClose: () => void
+}) {
+  const [selectedVariantId, setSelectedVariantId] = useState(variants[0]?.id ?? '')
+  const [added, setAdded] = useState(false)
+
+  const selectedVariant = variants.find(v => v.id === selectedVariantId) ?? variants[0]
   const displayImage = selectedVariant?.image_url || product.image_url
+  const isAvailable = (selectedVariant?.stock ?? 0) > 0
+
   function handleAddToCart() {
     if (!selectedVariant) return
     addToCart({
@@ -22,68 +73,96 @@ export default function ProductCard({ product }: { product: any }) {
       variantName: selectedVariant.name,
       price: selectedVariant.price,
       quantity: 1,
-      imageUrl: product.image_url
+      imageUrl: displayImage
     })
     setAdded(true)
     setTimeout(() => setAdded(false), 2000)
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-blue-50 overflow-hidden hover:shadow-md transition-shadow">
-      <div className="w-full h-40 bg-blue-50 flex items-center justify-center overflow-hidden">
-        {product.image_url ? (
-          <img src={displayImage} alt={product.name} className="w-full h-full object-cover" />
-        ) : (
-          <span className="text-blue-200 text-4xl">🃏</span>
-        )}
-      </div>
-      <div className="p-3">
-        <p className="text-xs text-blue-400 mb-0.5">
-          {product.type === 'set' ? 'เซ็ต' : product.type === 'single' ? 'การ์ดแยกใบ' : 'อุปกรณ์เสริม'}
-        </p>
-        <h3 className="font-semibold text-sm text-gray-800 leading-tight mb-1">{product.name}</h3>
-
-        {isOfficial && variants.length > 1 && (
-          <select
-            value={selectedVariantId}
-            onChange={e => setSelectedVariantId(e.target.value)}
-            className="w-full border rounded-lg px-2 py-1 text-xs mt-1 text-gray-600"
-          >
-            {variants.map((v: any) => (
-              <option key={v.id} value={v.id} disabled={v.stock === 0}>
-                {v.name} — ฿{v.price} {v.stock === 0 ? '(หมด)' : `(เหลือ ${v.stock})`}
-              </option>
-            ))}
-          </select>
-        )}
-
-        <div className="flex items-center justify-between mt-2">
-          <span className="text-blue-600 font-bold text-sm">
-            {selectedVariant ? `฿${selectedVariant.price}` : '-'}
-          </span>
-          <span className={`text-xs px-2 py-0.5 rounded-full ${isAvailable ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
-            {isAvailable ? `เหลือ ${selectedVariant?.stock ?? 0}` : 'หมด'}
-          </span>
+    <div
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-xl"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="w-full h-56 bg-blue-50 flex items-center justify-center overflow-hidden">
+          {displayImage ? (
+            <img src={displayImage} alt={product.name} className="w-full h-full object-cover" />
+          ) : (
+            <span className="text-blue-200 text-6xl">🃏</span>
+          )}
         </div>
 
-        {!isAvailable ? (
-          <button disabled className="mt-3 w-full text-sm py-1.5 rounded-lg bg-gray-100 text-gray-400 cursor-not-allowed">
-            หมดแล้ว
-          </button>
-        ) : isOfficial ? (
-          <button
-            onClick={handleAddToCart}
-            disabled={selectedVariant?.stock === 0}
-            className={`mt-3 w-full text-sm py-1.5 rounded-lg font-medium transition-colors ${added ? 'bg-green-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
-          >
-            {added ? '✓ เพิ่มแล้ว' : '+ ใส่ตะกร้า'}
-          </button>
-        ) : (
-          <a href={product.sellers?.contact_url} target="_blank" rel="noopener noreferrer"
-            className="mt-3 block text-center text-sm py-1.5 rounded-lg bg-slate-500 text-white hover:bg-slate-600 font-medium">
-            ติดต่อซื้อ
-          </a>
-        )}
+        <div className="p-5">
+          <p className="text-xs text-blue-400 mb-1">
+            {product.type === 'set' ? 'เซ็ต' : product.type === 'single' ? 'การ์ดแยกใบ' : 'อุปกรณ์เสริม'}
+            {' · '}{product.sellers?.name}
+          </p>
+          <h2 className="font-bold text-gray-800 text-lg leading-tight">{product.name}</h2>
+
+          {product.description && (
+            <p className="text-sm text-gray-500 mt-1">{product.description}</p>
+          )}
+
+          {variants.length > 1 && (
+            <div className="mt-3 space-y-1">
+              <p className="text-xs text-gray-500 font-medium">เลือก variant</p>
+              {variants.map((v: any) => (
+                <button
+                  key={v.id}
+                  onClick={() => setSelectedVariantId(v.id)}
+                  disabled={v.stock === 0}
+                  className={`w-full flex justify-between items-center px-3 py-2 rounded-lg border text-sm transition-colors ${
+                    selectedVariantId === v.id
+                      ? 'border-blue-400 bg-blue-50 text-blue-700'
+                      : v.stock === 0
+                      ? 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed'
+                      : 'border-gray-200 hover:border-blue-300'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    {v.image_url && <img src={v.image_url} className="w-8 h-8 rounded object-cover" />}
+                    <span>{v.name}</span>
+                  </div>
+                  <span className="font-bold">
+                    {v.stock === 0 ? 'หมด' : `฿${v.price}`}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {variants.length === 1 && (
+            <p className="text-2xl font-bold text-blue-600 mt-3">฿{selectedVariant?.price}</p>
+          )}
+
+          <div className="mt-4">
+            {!isOfficial ? (
+              <a
+                href={product.sellers?.contact_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block w-full text-center py-3 rounded-xl bg-slate-500 text-white font-medium hover:bg-slate-600"
+              >
+                ติดต่อซื้อ
+              </a>
+            ) : !isAvailable ? (
+              <button disabled className="w-full py-3 rounded-xl bg-gray-100 text-gray-400 cursor-not-allowed">
+                หมดแล้ว
+              </button>
+            ) : (
+              <button
+                onClick={handleAddToCart}
+                className={`w-full py-3 rounded-xl font-medium transition-colors ${added ? 'bg-green-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
+              >
+                {added ? '✓ เพิ่มในตะกร้าแล้ว' : '+ ใส่ตะกร้า'}
+              </button>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   )
