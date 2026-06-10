@@ -93,9 +93,10 @@ export default function CheckoutPage() {
         price: item.price,
         quantity: item.quantity
       })
-      await supabase.from('product_variants')
-        .update({ stock: supabase.rpc('decrement_stock', { variant_id: item.variantId, amount: item.quantity }) })
-        .eq('id', item.variantId)
+      await supabase.rpc('decrement_stock', {
+  variant_id: item.variantId,
+  amount: item.quantity
+})
     }
 
     clearCart()
