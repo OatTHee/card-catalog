@@ -33,8 +33,8 @@ export default function ProductCard({ product }: { product: any }) {
           <div className="flex items-center justify-between mt-2">
             <span className="text-blue-600 font-bold text-sm">{minPrice ? `฿${minPrice}` : '-'}</span>
             <span className={`text-xs px-2 py-0.5 rounded-full ${isAvailable ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
-              {isAvailable ? `เหลือ ${totalStock}` : 'หมด'}
-            </span>
+  {isAvailable ? 'มีสินค้า' : 'หมด'}
+</span>
           </div>
         </div>
       </div>
@@ -127,9 +127,10 @@ function ProductModal({ product, isOfficial, variants, onClose }: {
                     {v.image_url && <img src={v.image_url} className="w-8 h-8 rounded object-cover" />}
                     <span>{v.name}</span>
                   </div>
-                  <span className="font-bold">
-                    {v.stock === 0 ? 'หมด' : `฿${v.price}`}
-                  </span>
+                  <span className="font-bold text-right">
+  <span className="block">{v.stock === 0 ? 'หมด' : `฿${v.price}`}</span>
+  {v.stock > 0 && <span className="text-xs font-normal text-gray-400">เหลือ {v.stock}</span>}
+</span>
                 </button>
               ))}
             </div>
