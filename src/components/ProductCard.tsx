@@ -90,13 +90,19 @@ function ProductModal({ product, isOfficial, variants, onClose }: {
   onClick={e => e.stopPropagation()}
 >
   {/* รูปสินค้า fixed ด้านบน */}
-  <div className="w-full aspect-square bg-blue-50 flex items-center justify-center overflow-hidden rounded-t-2xl flex-shrink-0">
-    {displayImage ? (
-      <img src={displayImage} alt={product.name} className="w-full h-full object-contain" />
-    ) : (
-      <span className="text-blue-200 text-6xl">🃏</span>
-    )}
-  </div>
+<div className="relative w-full aspect-square bg-blue-50 flex items-center justify-center overflow-hidden rounded-t-2xl flex-shrink-0">
+  {displayImage ? (
+    <img src={displayImage} alt={product.name} className="w-full h-full object-contain" />
+  ) : (
+    <span className="text-blue-200 text-6xl">🃏</span>
+  )}
+  <button
+    onClick={onClose}
+    className="absolute top-3 right-3 w-8 h-8 bg-black bg-opacity-40 hover:bg-opacity-60 text-white rounded-full flex items-center justify-center text-lg"
+  >
+    ✕
+  </button>
+</div>
 
   {/* ส่วนล่าง scroll ได้ */}
   <div className="p-5 overflow-y-auto flex-1">

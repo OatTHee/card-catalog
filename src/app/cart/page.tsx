@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { getCart, removeFromCart, updateQuantity, CartItem } from '@/lib/cart'
 import { createClient } from '@supabase/supabase-js'
 import Header from '@/components/Header'
-
+import Footer from '@/components/Footer'
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
@@ -114,6 +114,7 @@ export default function CartPage() {
           </>
         )}
       </div>
+      <Footer />
     </main>
   )
 }

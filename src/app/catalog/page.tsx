@@ -2,6 +2,7 @@ export const revalidate = 0
 
 import Header from '@/components/Header'
 import { createClient } from '@supabase/supabase-js'
+import Footer from '@/components/Footer'
 
 async function getProducts() {
   const supabase = createClient(
@@ -46,9 +47,11 @@ export default async function CatalogPage() {
         <Section title="สินค้าแอดมิน" subtitle="ของแอดมิน" products={admin} color="sky" />
         <Section title="สินค้ามือสอง" subtitle="ร้านค้าอื่นๆ" products={vendor} color="slate" />
       </div>
+      <Footer />
     </main>
   )
 }
+
 
 function Section({ title, subtitle, products, color }: {
   title: string
