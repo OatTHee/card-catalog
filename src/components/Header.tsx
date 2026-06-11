@@ -24,12 +24,14 @@ export default function Header() {
     setCartCount(getCartCount())
 
     const handleStorage = () => setCartCount(getCartCount())
-    window.addEventListener('storage', handleStorage)
+window.addEventListener('cart-updated', handleStorage)
+window.addEventListener('storage', handleStorage)
 
-    return () => {
-      subscription.unsubscribe()
-      window.removeEventListener('storage', handleStorage)
-    }
+return () => {
+  subscription.unsubscribe()
+  window.removeEventListener('cart-updated', handleStorage)
+  window.removeEventListener('storage', handleStorage)
+}
   }, [])
 
   return (

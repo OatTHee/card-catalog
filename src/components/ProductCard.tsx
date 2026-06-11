@@ -18,13 +18,13 @@ export default function ProductCard({ product }: { product: any }) {
         onClick={() => setShowModal(true)}
         className="bg-white rounded-xl shadow-sm border border-blue-50 overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all cursor-pointer"
       >
-        <div className="w-full h-40 bg-blue-50 flex items-center justify-center overflow-hidden">
-          {product.image_url ? (
-            <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
-          ) : (
-            <span className="text-blue-200 text-4xl">🃏</span>
-          )}
-        </div>
+        <div className="w-full aspect-square bg-blue-50 flex items-center justify-center overflow-hidden">
+  {product.image_url ? (
+    <img src={product.image_url} alt={product.name} className="w-full h-full object-contain" />
+  ) : (
+    <span className="text-blue-200 text-4xl">🃏</span>
+  )}
+</div>
         <div className="p-3">
           <p className="text-xs text-blue-400 mb-0.5">
             {product.type === 'set' ? 'เซ็ต' : product.type === 'single' ? 'การ์ดแยกใบ' : 'อุปกรณ์เสริม'}
@@ -88,13 +88,13 @@ function ProductModal({ product, isOfficial, variants, onClose }: {
         className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-xl"
         onClick={e => e.stopPropagation()}
       >
-        <div className="w-full h-56 bg-blue-50 flex items-center justify-center overflow-hidden">
-          {displayImage ? (
-            <img src={displayImage} alt={product.name} className="w-full h-full object-cover" />
-          ) : (
-            <span className="text-blue-200 text-6xl">🃏</span>
-          )}
-        </div>
+        <div className="w-full aspect-square bg-blue-50 flex items-center justify-center overflow-hidden">
+  {displayImage ? (
+    <img src={displayImage} alt={product.name} className="w-full h-full object-contain" />
+  ) : (
+    <span className="text-blue-200 text-6xl">🃏</span>
+  )}
+</div>
 
         <div className="p-5">
           <p className="text-xs text-blue-400 mb-1">

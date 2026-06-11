@@ -39,7 +39,7 @@ export default async function CatalogPage() {
     <main className="min-h-screen bg-blue-50">
 <Header />
       <div className="max-w-5xl mx-auto px-4 py-8">
-        <Section title="สินค้ากลุ่ม" subtitle="กึ่งออฟฟิเชียล" products={official} color="blue" />
+        <Section title="สินค้ากลุ่ม" subtitle="มือ 1 กึ่งออฟฟิเชียล" products={official} color="blue" />
         <Section title="สินค้าแอดมิน" subtitle="ของแอดมิน" products={admin} color="sky" />
         <Section title="สินค้ามือสอง" subtitle="ร้านค้าอื่นๆ" products={vendor} color="slate" />
       </div>
