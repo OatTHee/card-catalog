@@ -12,19 +12,20 @@ export async function POST(req: Request) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       embeds: [
-        {
-          title: '🛒 มีคำสั่งซื้อใหม่!',
-          color: 0x3b82f6,
-          fields: [
-            { name: 'Order ID', value: `#${orderId.slice(0, 8)}`, inline: true },
-            { name: 'ลูกค้า', value: customerName || 'ไม่ระบุ', inline: true },
-            { name: 'รายการสินค้า', value: itemList },
-            { name: 'ยอดรวม', value: `฿${total}`, inline: true },
-          ],
-          image: slipUrl ? { url: slipUrl } : undefined,
-          timestamp: new Date().toISOString()
-        }
-      ],
+  {
+    title: '🛒 มีคำสั่งซื้อใหม่!',
+    description: '[📋 คลิกเพื่อจัดการ Order](https://card-catalog-pi.vercel.app/admin/orders)',
+    color: 0x3b82f6,
+    fields: [
+      { name: 'Order ID', value: `#${orderId.slice(0, 8)}`, inline: true },
+      { name: 'ลูกค้า', value: customerName || 'ไม่ระบุ', inline: true },
+      { name: 'รายการสินค้า', value: itemList },
+      { name: 'ยอดรวม', value: `฿${total}`, inline: true },
+    ],
+    image: slipUrl ? { url: slipUrl } : undefined,
+    timestamp: new Date().toISOString()
+  }
+],
       components: [
         {
           type: 1,
