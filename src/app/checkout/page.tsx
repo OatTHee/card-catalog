@@ -98,11 +98,12 @@ export default function CheckoutPage() {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
-    orderId: order.id,
-    customerName: session.user.user_metadata?.full_name || session.user.user_metadata?.username,
-    items: cart.map(i => ({ name: `${i.productName} - ${i.variantName}`, quantity: i.quantity, price: i.price })),
-    total: subtotal + shippingFee
-  })
+  orderId: order.id,
+  customerName: session.user.user_metadata?.full_name || session.user.user_metadata?.username,
+  items: cart.map(i => ({ name: `${i.productName} - ${i.variantName}`, quantity: i.quantity, price: i.price })),
+  total: subtotal + shippingFee,
+  slipUrl: slipData.publicUrl
+})
 })
     window.location.href = `/orders/${order.id}`
   }
