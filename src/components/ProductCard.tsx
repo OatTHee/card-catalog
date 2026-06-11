@@ -85,86 +85,89 @@ function ProductModal({ product, isOfficial, variants, onClose }: {
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-xl"
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="w-full aspect-square bg-blue-50 flex items-center justify-center overflow-hidden">
-  {displayImage ? (
-    <img src={displayImage} alt={product.name} className="w-full h-full object-contain" />
-  ) : (
-    <span className="text-blue-200 text-6xl">🃏</span>
-  )}
-</div>
+  className="bg-white rounded-2xl w-full max-w-sm shadow-xl flex flex-col"
+  style={{ maxHeight: '90vh' }}
+  onClick={e => e.stopPropagation()}
+>
+  {/* รูปสินค้า fixed ด้านบน */}
+  <div className="w-full aspect-square bg-blue-50 flex items-center justify-center overflow-hidden rounded-t-2xl flex-shrink-0">
+    {displayImage ? (
+      <img src={displayImage} alt={product.name} className="w-full h-full object-contain" />
+    ) : (
+      <span className="text-blue-200 text-6xl">🃏</span>
+    )}
+  </div>
 
-        <div className="p-5">
-          <p className="text-xs text-blue-400 mb-1">
-            {product.type === 'set' ? 'เซ็ต' : product.type === 'single' ? 'การ์ดแยกใบ' : 'อุปกรณ์เสริม'}
-            {' · '}{product.sellers?.name}
-          </p>
-          <h2 className="font-bold text-gray-800 text-lg leading-tight">{product.name}</h2>
+  {/* ส่วนล่าง scroll ได้ */}
+  <div className="p-5 overflow-y-auto flex-1">
+    <p className="text-xs text-blue-400 mb-1">
+      {product.type === 'set' ? 'เซ็ต' : product.type === 'single' ? 'การ์ดแยกใบ' : 'อุปกรณ์เสริม'}
+      {' · '}{product.sellers?.name}
+    </p>
+    <h2 className="font-bold text-gray-800 text-lg leading-tight">{product.name}</h2>
 
-          {product.description && (
-            <p className="text-sm text-gray-500 mt-1">{product.description}</p>
-          )}
+    {product.description && (
+      <p className="text-sm text-gray-500 mt-1">{product.description}</p>
+    )}
 
-          {variants.length > 1 && (
-            <div className="mt-3 space-y-1">
-              <p className="text-xs text-gray-500 font-medium">เลือก variant</p>
-              {variants.map((v: any) => (
-                <button
-                  key={v.id}
-                  onClick={() => setSelectedVariantId(v.id)}
-                  disabled={v.stock === 0}
-                  className={`w-full flex justify-between items-center px-3 py-2 rounded-lg border text-sm transition-colors ${
-                    selectedVariantId === v.id
-                      ? 'border-blue-400 bg-blue-50 text-blue-700'
-                      : v.stock === 0
-                      ? 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed'
-                      : 'border-gray-200 hover:border-blue-300'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    {v.image_url && <img src={v.image_url} className="w-8 h-8 rounded object-cover" />}
-                    <span>{v.name}</span>
-                  </div>
-                  <span className="font-bold text-right">
-  <span className="block">{v.stock === 0 ? 'หมด' : `฿${v.price}`}</span>
-  {v.stock > 0 && <span className="text-xs font-normal text-gray-400">เหลือ {v.stock}</span>}
-</span>
-                </button>
-              ))}
+    {variants.length > 1 && (
+      <div className="mt-3 space-y-1">
+        <p className="text-xs text-gray-500 font-medium">เลือก variant</p>
+        {variants.map((v: any) => (
+          <button
+            key={v.id}
+            onClick={() => setSelectedVariantId(v.id)}
+            disabled={v.stock === 0}
+            className={`w-full flex justify-between items-center px-3 py-2 rounded-lg border text-sm transition-colors ${
+              selectedVariantId === v.id
+                ? 'border-blue-400 bg-blue-50 text-blue-700'
+                : v.stock === 0
+                ? 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed'
+                : 'border-gray-200 hover:border-blue-300'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              {v.image_url && <img src={v.image_url} className="w-8 h-8 rounded object-cover" />}
+              <span>{v.name}</span>
             </div>
-          )}
-
-          {variants.length === 1 && (
-            <p className="text-2xl font-bold text-blue-600 mt-3">฿{selectedVariant?.price}</p>
-          )}
-
-          <div className="mt-4">
-            {!isOfficial ? (
-              <a
-                href={product.sellers?.contact_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block w-full text-center py-3 rounded-xl bg-slate-500 text-white font-medium hover:bg-slate-600"
-              >
-                ติดต่อซื้อ
-              </a>
-            ) : !isAvailable ? (
-              <button disabled className="w-full py-3 rounded-xl bg-gray-100 text-gray-400 cursor-not-allowed">
-                หมดแล้ว
-              </button>
-            ) : (
-              <button
-                onClick={handleAddToCart}
-                className={`w-full py-3 rounded-xl font-medium transition-colors ${added ? 'bg-green-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
-              >
-                {added ? '✓ เพิ่มในตะกร้าแล้ว' : '+ ใส่ตะกร้า'}
-              </button>
-            )}
-          </div>
-        </div>
+            <span className="font-bold text-right">
+              <span className="block">{v.stock === 0 ? 'หมด' : `฿${v.price}`}</span>
+              {v.stock > 0 && <span className="text-xs font-normal text-gray-400">เหลือ {v.stock}</span>}
+            </span>
+          </button>
+        ))}
       </div>
+    )}
+
+    {variants.length === 1 && (
+      <p className="text-2xl font-bold text-blue-600 mt-3">฿{selectedVariant?.price}</p>
+    )}
+
+    <div className="mt-4">
+      {!isOfficial ? (
+        <a
+          href={product.sellers?.contact_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block w-full text-center py-3 rounded-xl bg-slate-500 text-white font-medium hover:bg-slate-600"
+        >
+          ติดต่อซื้อ
+        </a>
+      ) : !isAvailable ? (
+        <button disabled className="w-full py-3 rounded-xl bg-gray-100 text-gray-400 cursor-not-allowed">
+          หมดแล้ว
+        </button>
+      ) : (
+        <button
+          onClick={handleAddToCart}
+          className={`w-full py-3 rounded-xl font-medium transition-colors ${added ? 'bg-green-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
+        >
+          {added ? '✓ เพิ่มในตะกร้าแล้ว' : '+ ใส่ตะกร้า'}
+        </button>
+      )}
     </div>
+  </div>
+</div>
+    </div> 
   )
 }
