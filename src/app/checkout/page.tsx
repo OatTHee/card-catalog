@@ -102,8 +102,12 @@ export default function CheckoutPage() {
   customerName: session.user.user_metadata?.full_name || session.user.user_metadata?.username,
   items: cart.map(i => ({ name: `${i.productName} - ${i.variantName}`, quantity: i.quantity, price: i.price })),
   total: subtotal + shippingFee,
-  slipUrl: slipData.publicUrl
-})
+  slipUrl: slipData.publicUrl,
+address: (() => {
+  const addr = addresses.find(a => a.id === selectedAddress)
+  if (!addr) return 'ไม่ระบุ'
+  return `${addr.name} | ${addr.phone}\n${addr.address} ${addr.district} ${addr.province} ${addr.postal_code}`
+})(),})
 })
     window.location.href = `/orders/${order.id}`
   }
