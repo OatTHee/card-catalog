@@ -9,17 +9,20 @@ async function getProducts() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
   )
 
-  const { data: products } = await supabase
-    .from('products')
-    .select('*')
 
   const { data: sellers } = await supabase
     .from('sellers')
     .select('*')
 
-  const { data: variants } = await supabase
-    .from('product_variants')
-    .select('*')
+ const { data: products } = await supabase
+  .from('products')
+  .select('*')
+  .order('sort_order', { ascending: true })
+
+const { data: variants } = await supabase
+  .from('product_variants')
+  .select('*')
+  .order('sort_order', { ascending: true })
 
   return (products ?? []).map(product => ({
     ...product,

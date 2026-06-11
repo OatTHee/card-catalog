@@ -2,6 +2,14 @@
 import { uploadImage } from '@/lib/upload'
 import { useEffect, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
+import {
+  DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent
+} from '@dnd-kit/core'
+import {
+  SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable, arrayMove
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
@@ -15,6 +23,7 @@ export default function AdminPage() {
     const [products, setProducts] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [shippingFee, setShippingFee] = useState('')
+    const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   useEffect(() => {
     checkAuthAndLoad()
   }, [])
@@ -41,19 +50,22 @@ async function checkAuthAndLoad() {
   alert('บันทึกแล้ว')
 }
   async function loadProducts() {
-    const { data: settings } = await supabase.from('settings').select('value').eq('key', 'shipping_fee').single()
-if (settings) setShippingFee(settings.value)
   const { data: productsData } = await supabase
     .from('products')
     .select('*, sellers(*), product_variants(*)')
-    .order('created_at', { ascending: false })
+    .order('sort_order', { ascending: true })
 
-  const { data: sellersData } = await supabase
-    .from('sellers')
-    .select('*')
+  const { data: sellersData } = await supabase.from('sellers').select('*')
+  const { data: settings } = await supabase.from('settings').select('value').eq('key', 'shipping_fee').single()
 
-  setProducts(productsData ?? [])
+  const sorted = (productsData ?? []).map(p => ({
+    ...p,
+    product_variants: [...(p.product_variants ?? [])].sort((a: any, b: any) => a.sort_order - b.sort_order)
+  }))
+
+  setProducts(sorted)
   setSellers(sellersData ?? [])
+  if (settings) setShippingFee(settings.value)
   setLoading(false)
 }
 async function handleDelete(productId: string) {
@@ -92,6 +104,46 @@ async function handleToggleAvailable(productId: string, current: boolean) {
     .eq('id', productId)
   loadProducts()
 }
+
+const sensors = useSensors(
+  useSensor(PointerSensor),
+  useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+)
+
+async function handleDragEnd(event: DragEndEvent) {
+  const { active, over } = event
+  if (!over || active.id === over.id) return
+
+  const oldIndex = products.findIndex(p => p.id === active.id)
+  const newIndex = products.findIndex(p => p.id === over.id)
+  const newProducts = arrayMove(products, oldIndex, newIndex)
+  setProducts(newProducts)
+
+  for (let i = 0; i < newProducts.length; i++) {
+    await supabase.from('products').update({ sort_order: i }).eq('id', newProducts[i].id)
+  }
+}
+
+async function handleVariantDragEnd(event: DragEndEvent, productId: string) {
+  const { active, over } = event
+  if (!over || active.id === over.id) return
+
+  const product = products.find((p: any) => p.id === productId) as { product_variants: any[] } | undefined
+  if (!product) return
+
+  const oldIndex = product.product_variants.findIndex((v: any) => v.id === active.id)
+  const newIndex = product.product_variants.findIndex((v: any) => v.id === over.id)
+  if (oldIndex === -1 || newIndex === -1) return
+  const newVariants = arrayMove<any>(product.product_variants, oldIndex, newIndex)
+
+  setProducts(products.map(p => p.id === productId ? { ...p, product_variants: newVariants } : p))
+
+  for (let i = 0; i < newVariants.length; i++) {
+    const variantId = (newVariants[i] as any).id
+    await supabase.from('product_variants').update({ sort_order: i }).eq('id', variantId)
+  }
+}
+
   async function handleLogout() {
     await supabase.auth.signOut()
     window.location.href = '/login'
@@ -129,56 +181,25 @@ async function handleToggleAvailable(productId: string, current: boolean) {
   </div>
 </div>
 
-      <div className="space-y-4">
-        {products.map(product => (
-          <div key={product.id} className="border rounded-lg p-4">
-            <div className="flex justify-between items-start">
-              <div>
-                <h3 className="font-medium">{product.name}</h3>
-                <p className="text-sm text-gray-500">{product.sellers?.name}</p>
-                <p className="text-xs text-gray-400 mt-1">
-                  {product.type === 'set' ? 'เซ็ต' : product.type === 'single' ? 'การ์ดแยกใบ' : 'อุปกรณ์เสริม'}
-                </p>
-              </div>
-<button
-  onClick={() => handleToggleAvailable(product.id, product.is_available)}
-  className={product.is_available
-    ? 'text-xs px-2 py-1 rounded bg-green-100 text-green-700 hover:bg-red-100 hover:text-red-700'
-    : 'text-xs px-2 py-1 rounded bg-gray-100 text-gray-500 hover:bg-green-100 hover:text-green-700'
-  }
->
-  {product.is_available ? 'แสดงอยู่' : 'ซ่อนอยู่'}
-</button>
-            </div>
-
-            {product.product_variants?.length > 0 && (
-              <div className="mt-3 space-y-2">
-                {product.product_variants.map((variant: any) => (
-                  <VariantRow
-                    key={variant.id}
-                    variant={variant}
-                    onStockUpdate={loadProducts}
-                  />
-                ))}
-              </div>
-            )}
-            <div className="flex gap-2 mt-3 pt-3 border-t">
-  <button
-    onClick={() => setEditProduct(product)}
-    className="text-xs text-blue-500 hover:text-blue-700"
-  >
-    แก้ไข
-  </button>
-  <button
-    onClick={() => handleDelete(product.id)}
-    className="text-xs text-red-400 hover:text-red-600"
-  >
-    ลบ
-  </button>
-</div>
-          </div>
-        ))}
-      </div>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+  <SortableContext items={products.map(p => p.id)} strategy={verticalListSortingStrategy}>
+    <div className="space-y-4">
+      {products.map(product => (
+        <SortableProductItem
+          key={product.id}
+          product={product}
+          collapsed={collapsed[product.id] ?? false}
+          onToggleCollapse={() => setCollapsed(prev => ({ ...prev, [product.id]: !prev[product.id] }))}
+          onEdit={() => setEditProduct(product)}
+          onDelete={() => handleDelete(product.id)}
+          onToggleAvailable={() => handleToggleAvailable(product.id, product.is_available)}
+          onStockUpdate={loadProducts}
+          onVariantDragEnd={handleVariantDragEnd}
+        />
+      ))}
+    </div>
+  </SortableContext>
+</DndContext>
       {showAddProduct && (
   <AddProductModal
     sellers={sellers}
@@ -224,7 +245,7 @@ async function handleToggleAvailable(productId: string, current: boolean) {
   </div>
 </div>
     </main>
-  )
+)
 }
 
 function VariantRow({ variant, onStockUpdate }: { variant: any, onStockUpdate: () => void }) {
@@ -265,6 +286,85 @@ function VariantRow({ variant, onStockUpdate }: { variant: any, onStockUpdate: (
           {saving ? '...' : 'บันทึก'}
         </button>
       </div>
+    </div>
+  )
+}
+function SortableProductItem({ product, collapsed, onToggleCollapse, onEdit, onDelete, onToggleAvailable, onStockUpdate, onVariantDragEnd }: {
+  product: any
+  collapsed: boolean
+  onToggleCollapse: () => void
+  onEdit: () => void
+  onDelete: () => void
+  onToggleAvailable: () => void
+  onStockUpdate: () => void
+  onVariantDragEnd: (event: DragEndEvent, productId: string) => void
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: product.id })
+  const style = { transform: CSS.Transform.toString(transform), transition }
+  const sensors = useSensors(useSensor(PointerSensor))
+
+  return (
+    <div ref={setNodeRef} style={style} className="border rounded-lg p-4 bg-white">
+      <div className="flex justify-between items-start">
+        <div className="flex items-center gap-2">
+          <span {...attributes} {...listeners} className="cursor-grab text-gray-300 hover:text-gray-500 text-lg">⠿</span>
+          <div>
+            <h3 className="font-medium">{product.name}</h3>
+            <p className="text-sm text-gray-500">{product.sellers?.name}</p>
+            <p className="text-xs text-gray-400 mt-1">
+              {product.type === 'set' ? 'เซ็ต' : product.type === 'single' ? 'การ์ดแยกใบ' : 'อุปกรณ์เสริม'}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onToggleAvailable}
+            className={product.is_available
+              ? 'text-xs px-2 py-1 rounded bg-green-100 text-green-700 hover:bg-red-100 hover:text-red-700'
+              : 'text-xs px-2 py-1 rounded bg-gray-100 text-gray-500 hover:bg-green-100 hover:text-green-700'
+            }
+          >
+            {product.is_available ? 'แสดงอยู่' : 'ซ่อนอยู่'}
+          </button>
+          <button onClick={onToggleCollapse} className="text-xs text-gray-400 hover:text-gray-600 px-2">
+            {collapsed ? '▼ ขยาย' : '▲ ย่อ'}
+          </button>
+        </div>
+      </div>
+
+      {!collapsed && (
+        <>
+          {product.product_variants?.length > 0 && (
+            <DndContext sensors={sensors} collisionDetection={closestCenter}
+              onDragEnd={e => onVariantDragEnd(e, product.id)}>
+              <SortableContext items={product.product_variants.map((v: any) => v.id)} strategy={verticalListSortingStrategy}>
+                <div className="mt-3 space-y-2">
+                  {product.product_variants.map((variant: any) => (
+                    <SortableVariantRow key={variant.id} variant={variant} onStockUpdate={onStockUpdate} />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
+          )}
+
+          <div className="flex gap-2 mt-3 pt-3 border-t">
+            <button onClick={onEdit} className="text-xs text-blue-500 hover:text-blue-700">แก้ไข</button>
+            <button onClick={onDelete} className="text-xs text-red-400 hover:text-red-600">ลบ</button>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function SortableVariantRow({ variant, onStockUpdate }: { variant: any, onStockUpdate: () => void }) {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: variant.id })
+  const style = { transform: CSS.Transform.toString(transform), transition }
+
+  return (
+    <div ref={setNodeRef} style={style} className="flex items-center gap-2 bg-gray-50 rounded px-3 py-2">
+      <span {...attributes} {...listeners} className="cursor-grab text-gray-300 hover:text-gray-500">⠿</span>
+      <VariantRow variant={variant} onStockUpdate={onStockUpdate} />
     </div>
   )
 }
