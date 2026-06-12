@@ -65,7 +65,11 @@ export default function CheckoutPage() {
 
     const ext = slipFile.name.split('.').pop()
     const fileName = `slips/${Date.now()}.${ext}`
-    const { error: uploadError } = await supabase.storage.from('products').upload(fileName, slipFile)
+    const { error: uploadError } = await supabase.storage.from('products').upload(fileName, slipFile, {
+  cacheControl: '3600',
+  contentType: slipFile.type,
+  upsert: false
+})
     if (uploadError) { alert('อัปโหลดสลิปไม่สำเร็จ'); setSubmitting(false); return }
     const { data: slipData } = supabase.storage.from('products').getPublicUrl(fileName)
 

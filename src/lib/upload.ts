@@ -10,8 +10,12 @@ export async function uploadImage(file: File): Promise<string | null> {
   const fileName = `${Date.now()}.${ext}`
 
   const { error } = await supabase.storage
-    .from('products')
-    .upload(fileName, file)
+  .from('products')
+  .upload(fileName, file, {
+    cacheControl: '31536000',
+    contentType: file.type,  // เพิ่มบรรทัดนี้
+    upsert: false
+  })
 
   if (error) {
     console.error('upload error:', error)
