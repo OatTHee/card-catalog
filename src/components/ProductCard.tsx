@@ -20,11 +20,12 @@ export default function ProductCard({ product }: { product: any }) {
         className="bg-white rounded-xl shadow-sm border border-blue-50 overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all cursor-pointer"
       >
         <div className="w-full aspect-square bg-blue-50 flex items-center justify-center overflow-hidden">
-  {product.image_url ? (
-<Image src={product.image_url} alt={product.name} fill className="object-contain" />
-) : (
+  <img src={product.image_url} alt={product.name}
+    className="w-full h-full object-contain block"
+    loading="lazy" />
+ : (
     <span className="text-blue-200 text-4xl">🃏</span>
-  )}
+  )
 </div>
         <div className="p-3">
           <p className="text-xs text-blue-400 mb-0.5">
@@ -134,7 +135,8 @@ function ProductModal({ product, isOfficial, variants, onClose }: {
             }`}
           >
             <div className="flex items-center gap-2">
-              {v.image_url && <Image src={v.image_url} alt={v.name} width={32} height={32} className="w-8 h-8 rounded object-cover" />}
+              {v.image_url && <img src={v.image_url} className="w-8 h-8 rounded object-cover block flex-shrink-0"
+  loading="lazy" />}
               <span>{v.name}</span>
             </div>
             <span className="font-bold text-right">
