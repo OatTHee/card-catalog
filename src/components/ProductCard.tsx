@@ -20,12 +20,13 @@ export default function ProductCard({ product }: { product: any }) {
         className="bg-white rounded-xl shadow-sm border border-blue-50 overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all cursor-pointer"
       >
         <div className="w-full aspect-square bg-blue-50 flex items-center justify-center overflow-hidden">
-  <img src={product.image_url} alt={product.name}
-    className="w-full h-full object-contain block"
-    loading="lazy" />
- : (
+  {product.image_url ? (
+    <img src={product.image_url} alt={product.name}
+      className="w-full h-full object-contain block"
+      loading="lazy" />
+  ) : (
     <span className="text-blue-200 text-4xl">🃏</span>
-  )
+  )}
 </div>
         <div className="p-3">
           <p className="text-xs text-blue-400 mb-0.5">
