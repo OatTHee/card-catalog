@@ -9,7 +9,22 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 )
-
+async function resizeImage(file: File, maxWidth = 800): Promise<File> {
+  return new Promise(resolve => {
+    const img = new window.Image()
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      const scale = Math.min(1, maxWidth / img.width)
+      canvas.width = img.width * scale
+      canvas.height = img.height * scale
+      canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
+      canvas.toBlob(blob => {
+        resolve(new File([blob!], file.name, { type: 'image/jpeg' }))
+      }, 'image/jpeg', 0.8)
+    }
+    img.src = URL.createObjectURL(file)
+  })
+}
 export default function CheckoutPage() {
   const [cart, setCart] = useState<CartItem[]>([])
   const [addresses, setAddresses] = useState<any[]>([])
@@ -65,9 +80,10 @@ export default function CheckoutPage() {
 
     const ext = slipFile.name.split('.').pop()
     const fileName = `slips/${Date.now()}.${ext}`
-    const { error: uploadError } = await supabase.storage.from('products').upload(fileName, slipFile, {
+    const resizedFile = await resizeImage(slipFile)
+    const { error: uploadError } = await supabase.storage.from('products').upload(fileName, resizedFile, {
   cacheControl: '3600',
-  contentType: slipFile.type,
+  contentType: resizedFile.type,
   upsert: false
 })
     if (uploadError) { alert('อัปโหลดสลิปไม่สำเร็จ'); setSubmitting(false); return }

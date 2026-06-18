@@ -2,6 +2,7 @@
 
 import { addToCart } from '@/lib/cart'
 import { useState } from 'react'
+import Image from 'next/image'
 
 export default function ProductCard({ product }: { product: any }) {
   const [showModal, setShowModal] = useState(false)
@@ -20,8 +21,8 @@ export default function ProductCard({ product }: { product: any }) {
       >
         <div className="w-full aspect-square bg-blue-50 flex items-center justify-center overflow-hidden">
   {product.image_url ? (
-    <img src={product.image_url} alt={product.name} className="w-full h-full object-contain" />
-  ) : (
+<Image src={product.image_url} alt={product.name} fill className="object-contain" />
+) : (
     <span className="text-blue-200 text-4xl">🃏</span>
   )}
 </div>
@@ -92,7 +93,7 @@ function ProductModal({ product, isOfficial, variants, onClose }: {
   {/* รูปสินค้า fixed ด้านบน */}
 <div className="relative w-full aspect-square bg-blue-50 flex items-center justify-center overflow-hidden rounded-t-2xl flex-shrink-0">
   {displayImage ? (
-    <img src={displayImage} alt={product.name} className="w-full h-full object-contain" />
+    <Image src={displayImage} alt={product.name} fill className="object-contain" />
   ) : (
     <span className="text-blue-200 text-6xl">🃏</span>
   )}
@@ -133,7 +134,7 @@ function ProductModal({ product, isOfficial, variants, onClose }: {
             }`}
           >
             <div className="flex items-center gap-2">
-              {v.image_url && <img src={v.image_url} className="w-8 h-8 rounded object-cover" />}
+              {v.image_url && <Image src={v.image_url} alt={v.name} width={32} height={32} className="w-8 h-8 rounded object-cover" />}
               <span>{v.name}</span>
             </div>
             <span className="font-bold text-right">
