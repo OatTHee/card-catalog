@@ -21,8 +21,7 @@ export default function ProductCard({ product }: { product: any }) {
       >
         <div className="w-full aspect-square bg-blue-50 flex items-center justify-center overflow-hidden">
   {product.image_url ? (
-    import Image from 'next/image'
-<Image
+    <Image
   src={product.image_url}
   alt={product.name}
   fill
