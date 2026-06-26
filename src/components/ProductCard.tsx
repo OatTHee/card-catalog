@@ -21,9 +21,14 @@ export default function ProductCard({ product }: { product: any }) {
       >
         <div className="w-full aspect-square bg-blue-50 flex items-center justify-center overflow-hidden">
   {product.image_url ? (
-    <img src={product.image_url} alt={product.name}
-      className="w-full h-full object-contain block"
-      loading="lazy" />
+    import Image from 'next/image'
+<Image
+  src={product.image_url}
+  alt={product.name}
+  fill
+  className="object-contain"
+  sizes="(max-width: 768px) 50vw, 25vw"
+/>
   ) : (
     <span className="text-blue-200 text-4xl">🃏</span>
   )}
@@ -96,6 +101,7 @@ function ProductModal({ product, isOfficial, variants, onClose }: {
 <div className="relative w-full aspect-square bg-blue-50 flex items-center justify-center overflow-hidden rounded-t-2xl flex-shrink-0">
   {displayImage ? (
     <Image src={displayImage} alt={product.name} fill className="object-contain" />
+
   ) : (
     <span className="text-blue-200 text-6xl">🃏</span>
   )}
