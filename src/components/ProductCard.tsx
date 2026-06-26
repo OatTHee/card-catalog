@@ -19,17 +19,20 @@ export default function ProductCard({ product }: { product: any }) {
         onClick={() => setShowModal(true)}
         className="bg-white rounded-xl shadow-sm border border-blue-50 overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all cursor-pointer"
       >
-        <div className="w-full aspect-square bg-blue-50 flex items-center justify-center overflow-hidden">
+        <div className="relative w-full aspect-square bg-blue-50 overflow-hidden">
   {product.image_url ? (
     <Image
-  src={product.image_url}
-  alt={product.name}
-  fill
-  className="object-contain"
-  sizes="(max-width: 768px) 50vw, 25vw"
-/>
+      src={product.image_url}
+      alt={product.name}
+      fill
+      className="object-contain"
+      sizes="(max-width: 768px) 50vw, 25vw"
+      loading="lazy"
+    />
   ) : (
-    <span className="text-blue-200 text-4xl">🃏</span>
+    <div className="w-full h-full flex items-center justify-center">
+      <span className="text-blue-200 text-4xl">🃏</span>
+    </div>
   )}
 </div>
         <div className="p-3">
