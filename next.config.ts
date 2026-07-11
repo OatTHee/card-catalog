@@ -10,7 +10,7 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'pub-xxxxxxxx.r2.dev', // เปลี่ยนเป็น R2 public URL จริงของคุณ
+        hostname: 'pub-b5f616fbd8a1437d8fd9a58a37363569.r2.dev',
       },
     ],
   },
