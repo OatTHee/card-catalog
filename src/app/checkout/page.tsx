@@ -78,16 +78,15 @@ export default function CheckoutPage() {
       }
     }
 
-    const ext = slipFile.name.split('.').pop()
-    const fileName = `slips/${Date.now()}.${ext}`
     const resizedFile = await resizeImage(slipFile)
-    const { error: uploadError } = await supabase.storage.from('products').upload(fileName, resizedFile, {
-  cacheControl: '3600',
-  contentType: resizedFile.type,
-  upsert: false
-})
-    if (uploadError) { alert('อัปโหลดสลิปไม่สำเร็จ'); setSubmitting(false); return }
-    const { data: slipData } = supabase.storage.from('products').getPublicUrl(fileName)
+
+    const slipFormData = new FormData()
+    slipFormData.append('file', resizedFile, resizedFile.name)
+    slipFormData.append('prefix', 'slips/')
+
+    const uploadRes = await fetch('/api/upload', { method: 'POST', body: slipFormData })
+    if (!uploadRes.ok) { alert('อัปโหลดสลิปไม่สำเร็จ'); setSubmitting(false); return }
+    const { url: slipUrl } = await uploadRes.json()
 
     const subtotal = cart.reduce((sum, i) => sum + i.price * i.quantity, 0)
     const { data: order, error: orderError } = await supabase.from('orders').insert({
@@ -96,7 +95,7 @@ export default function CheckoutPage() {
       subtotal,
       shipping_fee: shippingFee,
       total: subtotal + shippingFee,
-      slip_url: slipData.publicUrl,
+      slip_url: slipUrl,
       status: 'pending_payment'
     }).select().single()
 

@@ -1,0 +1,180 @@
+diff --git a/next.config.ts b/next.config.ts
+index 199c02c..040a0fc 100644
+--- a/next.config.ts
++++ b/next.config.ts
+@@ -6,7 +6,11 @@ const nextConfig: NextConfig = {
+     remotePatterns: [
+       {
+         protocol: 'https',
+-        hostname: '**.supabase.co',
++        hostname: '**.supabase.co', // เก็บไว้ชั่วคราวช่วง migrate รูปเก่า
++      },
++      {
++        protocol: 'https',
++        hostname: 'pub-xxxxxxxx.r2.dev', // เปลี่ยนเป็น R2 public URL จริงของคุณ
+       },
+     ],
+   },
+diff --git a/src/app/api/upload/route.ts b/src/app/api/upload/route.ts
+new file mode 100644
+index 0000000..2855518
+--- /dev/null
++++ b/src/app/api/upload/route.ts
+@@ -0,0 +1,31 @@
++import { NextRequest, NextResponse } from 'next/server'
++import { uploadToR2 } from '@/lib/r2'
++
++export async function POST(req: NextRequest) {
++  try {
++    const formData = await req.formData()
++    const file = formData.get('file') as File | null
++    const prefix = (formData.get('prefix') as string) || ''
++
++    if (!file) {
++      return NextResponse.json({ error: 'no file provided' }, { status: 400 })
++    }
++
++    // จำกัดขนาดไฟล์กันโดนยิงสแปม (ปรับได้ตามต้องการ)
++    const MAX_SIZE = 8 * 1024 * 1024 // 8MB
++    if (file.size > MAX_SIZE) {
++      return NextResponse.json({ error: 'file too large' }, { status: 413 })
++    }
++
++    const buffer = Buffer.from(await file.arrayBuffer())
++    const ext = file.name.split('.').pop() || 'bin'
++    const key = `${prefix}${Date.now()}-${crypto.randomUUID().slice(0, 8)}.${ext}`
++
++    const url = await uploadToR2(key, buffer, file.type || 'application/octet-stream')
++
++    return NextResponse.json({ url })
++  } catch (err) {
++    console.error('upload route error:', err)
++    return NextResponse.json({ error: 'upload failed' }, { status: 500 })
++  }
++}
+diff --git a/src/app/checkout/page.tsx b/src/app/checkout/page.tsx
+index 41999f6..f478c59 100644
+--- a/src/app/checkout/page.tsx
++++ b/src/app/checkout/page.tsx
+@@ -78,16 +78,15 @@ export default function CheckoutPage() {
+       }
+     }
+ 
+-    const ext = slipFile.name.split('.').pop()
+-    const fileName = `slips/${Date.now()}.${ext}`
+     const resizedFile = await resizeImage(slipFile)
+-    const { error: uploadError } = await supabase.storage.from('products').upload(fileName, resizedFile, {
+-  cacheControl: '3600',
+-  contentType: resizedFile.type,
+-  upsert: false
+-})
+-    if (uploadError) { alert('อัปโหลดสลิปไม่สำเร็จ'); setSubmitting(false); return }
+-    const { data: slipData } = supabase.storage.from('products').getPublicUrl(fileName)
++
++    const slipFormData = new FormData()
++    slipFormData.append('file', resizedFile, resizedFile.name)
++    slipFormData.append('prefix', 'slips/')
++
++    const uploadRes = await fetch('/api/upload', { method: 'POST', body: slipFormData })
++    if (!uploadRes.ok) { alert('อัปโหลดสลิปไม่สำเร็จ'); setSubmitting(false); return }
++    const { url: slipUrl } = await uploadRes.json()
+ 
+     const subtotal = cart.reduce((sum, i) => sum + i.price * i.quantity, 0)
+     const { data: order, error: orderError } = await supabase.from('orders').insert({
+@@ -96,7 +95,7 @@ export default function CheckoutPage() {
+       subtotal,
+       shipping_fee: shippingFee,
+       total: subtotal + shippingFee,
+-      slip_url: slipData.publicUrl,
++      slip_url: slipUrl,
+       status: 'pending_payment'
+     }).select().single()
+ 
+diff --git a/src/lib/r2.ts b/src/lib/r2.ts
+new file mode 100644
+index 0000000..d6cd18c
+--- /dev/null
++++ b/src/lib/r2.ts
+@@ -0,0 +1,29 @@
++import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
++
++// ⚠️ ไฟล์นี้รันฝั่ง server เท่านั้น (API route) ห้าม import เข้า client component
++const r2 = new S3Client({
++  region: 'auto',
++  endpoint: `https://${process.env.CLOUDFLARE_R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
++  credentials: {
++    accessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID!,
++    secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY!,
++  },
++})
++
++export async function uploadToR2(
++  key: string,
++  body: Buffer,
++  contentType: string
++): Promise<string> {
++  await r2.send(
++    new PutObjectCommand({
++      Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME!,
++      Key: key,
++      Body: body,
++      ContentType: contentType,
++      CacheControl: 'public, max-age=31536000, immutable',
++    })
++  )
++
++  return `${process.env.NEXT_PUBLIC_R2_PUBLIC_URL}/${key}`
++}
+diff --git a/src/lib/upload.ts b/src/lib/upload.ts
+index 1f1bf45..f00a149 100644
+--- a/src/lib/upload.ts
++++ b/src/lib/upload.ts
+@@ -1,10 +1,3 @@
+-import { createClient } from '@supabase/supabase-js'
+-
+-const supabase = createClient(
+-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+-)
+-
+ export async function compressImage(file: File, maxWidthPx = 800): Promise<Blob> {
+   return new Promise((resolve) => {
+     const img = new window.Image()
+@@ -21,25 +14,19 @@ export async function compressImage(file: File, maxWidthPx = 800): Promise<Blob>
+ }
+ 
+ export async function uploadImage(file: File): Promise<string | null> {
+-  const compressed = await compressImage(file) // เพิ่มบรรทัดนี้
+-  const fileName = `${Date.now()}.webp`        // เปลี่ยน ext เป็น webp
++  const compressed = await compressImage(file)
++
++  const formData = new FormData()
++  formData.append('file', compressed, `${Date.now()}.webp`)
++  formData.append('prefix', 'products/')
+ 
+-  const { error } = await supabase.storage
+-    .from('products')
+-    .upload(fileName, compressed, {  // ส่ง compressed แทน file
+-      cacheControl: '31536000',
+-      contentType: 'image/webp',
+-      upsert: false,
+-    })
++  const res = await fetch('/api/upload', { method: 'POST', body: formData })
+ 
+-  if (error) {
+-    console.error('upload error:', error)
++  if (!res.ok) {
++    console.error('upload error:', await res.text())
+     return null
+   }
+ 
+-  const { data } = supabase.storage
+-    .from('products')
+-    .getPublicUrl(fileName)
+-
+-  return data.publicUrl
+-}
+\ No newline at end of file
++  const { url } = await res.json()
++  return url as string
++}

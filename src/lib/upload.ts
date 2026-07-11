@@ -1,10 +1,3 @@
-import { createClient } from '@supabase/supabase-js'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-)
-
 export async function compressImage(file: File, maxWidthPx = 800): Promise<Blob> {
   return new Promise((resolve) => {
     const img = new window.Image()
@@ -21,25 +14,19 @@ export async function compressImage(file: File, maxWidthPx = 800): Promise<Blob>
 }
 
 export async function uploadImage(file: File): Promise<string | null> {
-  const compressed = await compressImage(file) // เพิ่มบรรทัดนี้
-  const fileName = `${Date.now()}.webp`        // เปลี่ยน ext เป็น webp
+  const compressed = await compressImage(file)
 
-  const { error } = await supabase.storage
-    .from('products')
-    .upload(fileName, compressed, {  // ส่ง compressed แทน file
-      cacheControl: '31536000',
-      contentType: 'image/webp',
-      upsert: false,
-    })
+  const formData = new FormData()
+  formData.append('file', compressed, `${Date.now()}.webp`)
+  formData.append('prefix', 'products/')
 
-  if (error) {
-    console.error('upload error:', error)
+  const res = await fetch('/api/upload', { method: 'POST', body: formData })
+
+  if (!res.ok) {
+    console.error('upload error:', await res.text())
     return null
   }
 
-  const { data } = supabase.storage
-    .from('products')
-    .getPublicUrl(fileName)
-
-  return data.publicUrl
+  const { url } = await res.json()
+  return url as string
 }

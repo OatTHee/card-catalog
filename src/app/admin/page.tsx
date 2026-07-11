@@ -2,6 +2,7 @@
 import { uploadImage } from '@/lib/upload'
 import { useEffect, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
+import { revalidateCatalog } from '@/app/actions/revalidate'
 import {
   DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent
 } from '@dnd-kit/core'
@@ -96,6 +97,7 @@ async function handleDelete(productId: string) {
   }
 
   loadProducts()
+  revalidateCatalog()
 }
 async function handleToggleAvailable(productId: string, current: boolean) {
   await supabase
@@ -103,6 +105,7 @@ async function handleToggleAvailable(productId: string, current: boolean) {
     .update({ is_available: !current })
     .eq('id', productId)
   loadProducts()
+  revalidateCatalog()
 }
 
 const sensors = useSensors(
@@ -122,6 +125,7 @@ async function handleDragEnd(event: DragEndEvent) {
   for (let i = 0; i < newProducts.length; i++) {
     await supabase.from('products').update({ sort_order: i }).eq('id', newProducts[i].id)
   }
+  revalidateCatalog()
 }
 
 async function handleVariantDragEnd(event: DragEndEvent, productId: string) {
@@ -142,6 +146,7 @@ async function handleVariantDragEnd(event: DragEndEvent, productId: string) {
     const variantId = (newVariants[i] as any).id
     await supabase.from('product_variants').update({ sort_order: i }).eq('id', variantId)
   }
+  revalidateCatalog()
 }
 
   async function handleLogout() {
@@ -266,6 +271,7 @@ function VariantRow({ variant, onStockUpdate }: { variant: any, onStockUpdate: (
   console.log('update result:', data, error)
   setSaving(false)
   onStockUpdate()
+  revalidateCatalog()
 }
   return (
     <div className="flex items-center justify-between bg-gray-50 rounded px-3 py-2">
@@ -445,6 +451,7 @@ if (validVariants.length > 0) {
 }
   setSaving(false)
   onSaved()
+  revalidateCatalog()
 }
 
   return (
@@ -629,6 +636,7 @@ function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
   async function handleDeleteVariant(variantId: string) {
     await supabase.from('product_variants').delete().eq('id', variantId)
     setVariants(variants.filter(v => v.id !== variantId))
+    revalidateCatalog()
   }
 
   async function handleSave() {
@@ -665,6 +673,7 @@ function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
 
   setSaving(false)
   onSaved()
+  revalidateCatalog()
 }
 
   return (

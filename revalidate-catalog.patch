@@ -1,0 +1,89 @@
+diff --git a/src/app/actions/revalidate.ts b/src/app/actions/revalidate.ts
+new file mode 100644
+index 0000000..b25188b
+--- /dev/null
++++ b/src/app/actions/revalidate.ts
+@@ -0,0 +1,7 @@
++'use server'
++
++import { revalidatePath } from 'next/cache'
++
++export async function revalidateCatalog() {
++  revalidatePath('/catalog')
++}
+diff --git a/src/app/admin/page.tsx b/src/app/admin/page.tsx
+index 93989eb..20785b4 100644
+--- a/src/app/admin/page.tsx
++++ b/src/app/admin/page.tsx
+@@ -9,6 +9,7 @@ import {
+   SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable, arrayMove
+ } from '@dnd-kit/sortable'
+ import { CSS } from '@dnd-kit/utilities'
++import { revalidateCatalog } from '@/app/actions/revalidate'
+ 
+ const supabase = createClient(
+   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+@@ -96,6 +97,7 @@ async function handleDelete(productId: string) {
+   }
+ 
+   loadProducts()
++  revalidateCatalog()
+ }
+ async function handleToggleAvailable(productId: string, current: boolean) {
+   await supabase
+@@ -103,6 +105,7 @@ async function handleToggleAvailable(productId: string, current: boolean) {
+     .update({ is_available: !current })
+     .eq('id', productId)
+   loadProducts()
++  revalidateCatalog()
+ }
+ 
+ const sensors = useSensors(
+@@ -122,6 +125,7 @@ async function handleDragEnd(event: DragEndEvent) {
+   for (let i = 0; i < newProducts.length; i++) {
+     await supabase.from('products').update({ sort_order: i }).eq('id', newProducts[i].id)
+   }
++  revalidateCatalog()
+ }
+ 
+ async function handleVariantDragEnd(event: DragEndEvent, productId: string) {
+@@ -142,6 +146,7 @@ async function handleVariantDragEnd(event: DragEndEvent, productId: string) {
+     const variantId = (newVariants[i] as any).id
+     await supabase.from('product_variants').update({ sort_order: i }).eq('id', variantId)
+   }
++  revalidateCatalog()
+ }
+ 
+   async function handleLogout() {
+@@ -266,6 +271,7 @@ function VariantRow({ variant, onStockUpdate }: { variant: any, onStockUpdate: (
+   console.log('update result:', data, error)
+   setSaving(false)
+   onStockUpdate()
++  revalidateCatalog()
+ }
+   return (
+     <div className="flex items-center justify-between bg-gray-50 rounded px-3 py-2">
+@@ -445,6 +451,7 @@ if (validVariants.length > 0) {
+ }
+   setSaving(false)
+   onSaved()
++  revalidateCatalog()
+ }
+ 
+   return (
+@@ -629,6 +636,7 @@ function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+   async function handleDeleteVariant(variantId: string) {
+     await supabase.from('product_variants').delete().eq('id', variantId)
+     setVariants(variants.filter(v => v.id !== variantId))
++    revalidateCatalog()
+   }
+ 
+   async function handleSave() {
+@@ -665,6 +673,7 @@ function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+ 
+   setSaving(false)
+   onSaved()
++  revalidateCatalog()
+ }
+ 
+   return (
