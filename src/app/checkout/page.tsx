@@ -121,7 +121,7 @@ export default function CheckoutPage() {
   customerName: session.user.user_metadata?.full_name || session.user.user_metadata?.username,
   items: cart.map(i => ({ name: `${i.productName} - ${i.variantName}`, quantity: i.quantity, price: i.price })),
   total: subtotal + shippingFee,
-  slipUrl: slipData.publicUrl,
+  slipUrl: slipUrl,
 address: (() => {
   const addr = addresses.find(a => a.id === selectedAddress)
   if (!addr) return 'ไม่ระบุ'
