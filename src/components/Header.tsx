@@ -12,13 +12,16 @@ const supabase = createClient(
 export default function Header() {
   const [user, setUser] = useState<any>(null)
   const [cartCount, setCartCount] = useState(0)
+  const [bagCount, setBagCount] = useState(0)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null)
+      if (session?.user) loadBagCount(session.user.id)
     })
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
       setUser(session?.user ?? null)
+      if (session?.user) loadBagCount(session.user.id)
     })
 
     setCartCount(getCartCount())
@@ -34,6 +37,15 @@ return () => {
 }
   }, [])
 
+  async function loadBagCount(userId: string) {
+    const { count } = await supabase
+      .from('redemptions')
+      .select('id', { count: 'exact', head: true })
+      .eq('customer_id', userId)
+      .eq('status', 'in_bag')
+    setBagCount(count ?? 0)
+  }
+
   return (
     <header className="bg-white border-b border-blue-100 shadow-sm">
       <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
@@ -46,6 +58,14 @@ return () => {
         <div className="flex items-center gap-3">
           {user ? (
             <>
+              <a href="/redeem" className="relative text-gray-600 hover:text-amber-500" title="แลกแต้ม">
+                <span className="text-xl">🎁</span>
+                {bagCount > 0 && (
+                  <span className="absolute -top-1 -right-2 bg-amber-500 text-white text-xs w-4 h-4 rounded-full flex items-center justify-center">
+                    {bagCount}
+                  </span>
+                )}
+              </a>
               <a href="/cart" className="relative text-gray-600 hover:text-blue-500">
                 <span className="text-xl">🛒</span>
                 {cartCount > 0 && (

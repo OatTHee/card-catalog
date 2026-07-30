@@ -18,6 +18,18 @@ export default function ConfirmPage() {
           email: session.user.email,
           avatar_url: session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture
         }, { onConflict: 'id' })
+
+        // เคลมแต้ม/exp/สถิติ/ของในกระเป๋าจากระบบเก่า (ถ้ามี) — ทำเงียบๆ ไม่บล็อก
+        // การ login ถ้าไม่มีข้อมูลเก่าก็แค่ไม่มีอะไรเกิดขึ้น (claimed: false)
+        try {
+          const { data } = await supabase.rpc('claim_legacy_account', { p_user_id: session.user.id })
+          if (data?.claimed) {
+            console.log(`เคลมข้อมูลเก่าสำเร็จ: UID ${data.uid}, +${data.points_added} แต้ม, +${data.exp_added} EXP`)
+          }
+        } catch (err) {
+          console.error('claim_legacy_account error:', err)
+        }
+
         window.location.href = '/catalog'
       } else if (event === 'SIGNED_OUT') {
         window.location.href = '/login?error=auth'

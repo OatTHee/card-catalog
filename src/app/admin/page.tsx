@@ -275,7 +275,10 @@ function VariantRow({ variant, onStockUpdate }: { variant: any, onStockUpdate: (
 }
   return (
     <div className="flex items-center justify-between bg-gray-50 rounded px-3 py-2">
-      <span className="text-sm">{variant.name} — ฿{variant.price}</span>
+      <span className="text-sm">
+        {variant.name} — ฿{variant.price}
+        {variant.redeem_points != null && <span className="text-amber-500"> · ✨{variant.redeem_points}</span>}
+      </span>
       <div className="flex items-center gap-2">
         <input
           type="number"
@@ -319,6 +322,7 @@ function SortableProductItem({ product, collapsed, onToggleCollapse, onEdit, onD
             <p className="text-sm text-gray-500">{product.sellers?.name}</p>
             <p className="text-xs text-gray-400 mt-1">
               {product.type === 'set' ? 'เซ็ต' : product.type === 'single' ? 'การ์ดแยกใบ' : 'อุปกรณ์เสริม'}
+              {product.is_for_redeem && <span className="ml-2 text-amber-500">🎁 แลกด้วยแต้มได้</span>}
             </p>
           </div>
         </div>
@@ -386,8 +390,10 @@ function AddProductModal({ sellers, onClose, onSaved }: {
   const [type, setType] = useState('set')
   const [sellerId, setSellerId] = useState(sellers[0]?.id ?? '')
   const [description, setDescription] = useState('')
-  const [variants, setVariants] = useState([{ name: '', price: '', stock: '', image_url: '', imageFile: null as File | null }])
+  const [variants, setVariants] = useState([{ name: '', price: '', stock: '', image_url: '', imageFile: null as File | null, redeemPoints: '' }])
   const [saving, setSaving] = useState(false)
+  const [isForSale, setIsForSale] = useState(true)
+  const [isForRedeem, setIsForRedeem] = useState(false)
 
   function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
   const file = e.target.files?.[0]
@@ -397,7 +403,7 @@ function AddProductModal({ sellers, onClose, onSaved }: {
 }
 
   function addVariantRow() {
-    setVariants([...variants, { name: '', price: '', stock: '', image_url: '', imageFile: null }])
+    setVariants([...variants, { name: '', price: '', stock: '', image_url: '', imageFile: null, redeemPoints: '' }])
   }
 
   function removeVariantRow(index: number) {
@@ -422,7 +428,7 @@ function AddProductModal({ sellers, onClose, onSaved }: {
 
   const { data: product, error } = await supabase
     .from('products')
-    .insert({ name, type, seller_id: sellerId, description, image_url: imageUrl, is_available: true })
+    .insert({ name, type, seller_id: sellerId, description, image_url: imageUrl, is_available: true, is_for_sale: isForSale, is_for_redeem: isForRedeem })
     .select()
     .single()
 
@@ -445,7 +451,8 @@ if (validVariants.length > 0) {
       name: v.name,
       price: Number(v.price),
       stock: Number(v.stock) || 0,
-      image_url: imageUrl
+      image_url: imageUrl,
+      redeem_points: isForRedeem && v.redeemPoints ? Number(v.redeemPoints) : null
     })
   }
 }
@@ -505,6 +512,17 @@ if (validVariants.length > 0) {
               rows={2}
             />
           </div>
+
+          <div className="flex gap-4 border rounded-lg p-3 bg-gray-50">
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input type="checkbox" checked={isForSale} onChange={e => setIsForSale(e.target.checked)} />
+              ขายในร้านค้า (/catalog)
+            </label>
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input type="checkbox" checked={isForRedeem} onChange={e => setIsForRedeem(e.target.checked)} />
+              เปิดให้แลกด้วยแต้ม (/redeem)
+            </label>
+          </div>
 <div>
   <label className="text-sm text-gray-600">รูปสินค้า</label>
   <input
@@ -558,6 +576,15 @@ if (validVariants.length > 0) {
         <button onClick={() => removeVariantRow(i)} className="text-red-400 text-sm">✕</button>
       )}
     </div>
+    {isForRedeem && (
+      <input
+        value={v.redeemPoints}
+        onChange={e => updateVariant(i, 'redeemPoints', e.target.value)}
+        placeholder="แต้มที่ใช้แลก (ว่าง = แลก variant นี้ไม่ได้)"
+        type="number"
+        className="w-full border rounded px-2 py-1 text-sm border-amber-300 bg-amber-50"
+      />
+    )}
     <div>
       <input
         type="file"
@@ -608,9 +635,13 @@ const [imagePreview, setImagePreview] = useState<string>(product.image_url ?? ''
   const [type, setType] = useState(product.type)
   const [sellerId, setSellerId] = useState(product.seller_id)
   const [description, setDescription] = useState(product.description ?? '')
-  const [variants, setVariants] = useState<any[]>(product.product_variants ?? [])
+  const [variants, setVariants] = useState<any[]>(
+    (product.product_variants ?? []).map((v: any) => ({ ...v, redeemPoints: v.redeem_points ?? '' }))
+  )
   const [newVariants, setNewVariants] = useState<any[]>([])
   const [saving, setSaving] = useState(false)
+  const [isForSale, setIsForSale] = useState(product.is_for_sale ?? true)
+  const [isForRedeem, setIsForRedeem] = useState(product.is_for_redeem ?? false)
 function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
   const file = e.target.files?.[0]
   if (!file) return
@@ -618,7 +649,7 @@ function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
   setImagePreview(URL.createObjectURL(file))
 }
   function addNewVariantRow() {
-    setNewVariants([...newVariants, { name: '', price: '', stock: '' }])
+    setNewVariants([...newVariants, { name: '', price: '', stock: '', redeemPoints: '' }])
   }
 
   function updateNewVariant(index: number, field: string, value: string) {
@@ -650,12 +681,18 @@ function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
 
   await supabase
     .from('products')
-    .update({ name, type, seller_id: sellerId, description, image_url: imageUrl })
+    .update({ name, type, seller_id: sellerId, description, image_url: imageUrl, is_for_sale: isForSale, is_for_redeem: isForRedeem })
     .eq('id', product.id)
 
   for (const v of variants) {
   await supabase.from('product_variants')
-    .update({ name: v.name, price: Number(v.price), stock: Number(v.stock), image_url: v.image_url })
+    .update({
+      name: v.name,
+      price: Number(v.price),
+      stock: Number(v.stock),
+      image_url: v.image_url,
+      redeem_points: isForRedeem && v.redeemPoints ? Number(v.redeemPoints) : null
+    })
     .eq('id', v.id)
 }
 
@@ -666,7 +703,8 @@ function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
         product_id: product.id,
         name: v.name,
         price: Number(v.price),
-        stock: Number(v.stock) || 0
+        stock: Number(v.stock) || 0,
+        redeem_points: isForRedeem && v.redeemPoints ? Number(v.redeemPoints) : null
       }))
     )
   }
@@ -726,6 +764,17 @@ function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
               rows={2}
             />
           </div>
+
+          <div className="flex gap-4 border rounded-lg p-3 bg-gray-50">
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input type="checkbox" checked={isForSale} onChange={e => setIsForSale(e.target.checked)} />
+              ขายในร้านค้า (/catalog)
+            </label>
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input type="checkbox" checked={isForRedeem} onChange={e => setIsForRedeem(e.target.checked)} />
+              เปิดให้แลกด้วยแต้ม (/redeem)
+            </label>
+          </div>
 <div>
   <label className="text-sm text-gray-600">รูปสินค้า</label>
   <input
@@ -764,6 +813,15 @@ function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
         type="number" placeholder="สต็อก" className="w-20 border rounded px-2 py-1 text-sm" />
       <button onClick={() => handleDeleteVariant(v.id)} className="text-red-400 text-sm">✕</button>
     </div>
+    {isForRedeem && (
+      <input
+        value={v.redeemPoints}
+        onChange={e => updateExistingVariant(i, 'redeemPoints', e.target.value)}
+        placeholder="แต้มที่ใช้แลก (ว่าง = แลก variant นี้ไม่ได้)"
+        type="number"
+        className="w-full border rounded px-2 py-1 text-sm border-amber-300 bg-amber-50"
+      />
+    )}
     <div>
       {v.image_url && <img src={v.image_url} className="h-16 object-cover rounded mb-1" />}
       <input
@@ -809,6 +867,16 @@ function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
                   ✕
                 </button>
               </div>
+            ))}
+            {isForRedeem && newVariants.map((v, i) => (
+              <input
+                key={'redeem-' + i}
+                value={v.redeemPoints}
+                onChange={e => updateNewVariant(i, 'redeemPoints', e.target.value)}
+                placeholder={`แต้มที่ใช้แลก "${v.name || 'variant ใหม่'}" (ว่าง = แลกไม่ได้)`}
+                type="number"
+                className="w-full border rounded px-2 py-1 text-sm border-amber-300 bg-amber-50 mb-2 -mt-1"
+              />
             ))}
           </div>
         </div>
