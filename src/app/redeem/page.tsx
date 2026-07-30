@@ -30,7 +30,7 @@ export default function RedeemPage() {
   async function loadAll(userId: string) {
     setLoading(true)
     const [{ data: profile }, { data: prods }, { data: variants }, { data: bag }] = await Promise.all([
-      supabase.from('customers').select('points').eq('id', userId).single(),
+      supabase.from('customers').select('points').eq('id', userId).maybeSingle(),
       supabase.from('products').select('*').eq('is_for_redeem', true).order('sort_order', { ascending: true }),
       supabase.from('product_variants').select('*').not('redeem_points', 'is', null).order('sort_order', { ascending: true }),
       supabase.from('bag').select('*').eq('customer_id', userId).eq('status', 'In Bag').order('created_at', { ascending: false })
@@ -137,7 +137,7 @@ function BagSection({ userId, bagItems, onChanged }: {
   const totalPoints = bagItems.reduce((sum, i) => sum + i.points_used * (i.qty || 1), 0)
 
   useEffect(() => {
-    supabase.from('settings').select('value').eq('key', 'redeem_free_shipping_threshold').single()
+    supabase.from('settings').select('value').eq('key', 'redeem_free_shipping_threshold').maybeSingle()
       .then(({ data }) => { if (data) setFreeThreshold(Number(data.value)) })
   }, [])
 
@@ -226,8 +226,8 @@ function ConfirmShipmentModal({ userId, totalPoints, onClose, onConfirmed }: {
   useEffect(() => {
     Promise.all([
       supabase.from('shipping_addresses').select('*').eq('customer_id', userId).order('is_default', { ascending: false }),
-      supabase.from('settings').select('value').eq('key', 'shipping_fee').single(),
-      supabase.from('settings').select('value').eq('key', 'redeem_free_shipping_threshold').single()
+      supabase.from('settings').select('value').eq('key', 'shipping_fee').maybeSingle(),
+      supabase.from('settings').select('value').eq('key', 'redeem_free_shipping_threshold').maybeSingle()
     ]).then(([{ data: addrs }, { data: settings }, { data: thresholdSetting }]) => {
       setAddresses(addrs ?? [])
       if (addrs?.length) setSelectedAddress(addrs.find((a: any) => a.is_default)?.id || addrs[0].id)
