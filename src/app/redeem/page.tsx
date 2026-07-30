@@ -259,7 +259,7 @@ function ConfirmShipmentModal({ userId, totalPoints, onClose, onConfirmed }: {
       slipUrl = uploadData.url
     }
 
-    const { error: rpcError } = await supabase.rpc('bridge_bag_to_history', {
+    const { data: rpcData, error: rpcError } = await supabase.rpc('bridge_bag_to_history', {
       p_shipping_address_id: selectedAddress,
       p_slip_url: slipUrl,
       p_is_merge_order: isMergeOrder
@@ -270,6 +270,19 @@ function ConfirmShipmentModal({ userId, totalPoints, onClose, onConfirmed }: {
     if (rpcError) {
       setError(rpcError.message || 'ยืนยันจัดส่งไม่สำเร็จ')
       return
+    }
+
+    // ยิง Discord webhook แจ้งแอดมิน (ไม่บล็อก flow ถ้า webhook ล้มเหลว)
+    if (rpcData?.history_id) {
+      try {
+        await fetch('/api/redeem-notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ historyId: rpcData.history_id })
+        })
+      } catch (err) {
+        console.error('webhook notify failed:', err)
+      }
     }
 
     onConfirmed()
