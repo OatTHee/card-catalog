@@ -33,7 +33,7 @@ export default function RedeemPage() {
       supabase.from('customers').select('points').eq('id', userId).single(),
       supabase.from('products').select('*').eq('is_for_redeem', true).order('sort_order', { ascending: true }),
       supabase.from('product_variants').select('*').not('redeem_points', 'is', null).order('sort_order', { ascending: true }),
-      supabase.from('redemptions').select('*').eq('customer_id', userId).eq('status', 'in_bag').order('created_at', { ascending: false })
+      supabase.from('bag').select('*').eq('customer_id', userId).eq('status', 'In Bag').order('created_at', { ascending: false })
     ])
 
     setMyPoints(profile?.points ?? 0)
@@ -130,16 +130,19 @@ function BagSection({ userId, bagItems, onChanged }: {
   bagItems: any[]
   onChanged: () => void
 }) {
-  const [selected, setSelected] = useState<string[]>([])
   const [showConfirm, setShowConfirm] = useState(false)
+  const [freeThreshold, setFreeThreshold] = useState(40)
 
-  const totalPoints = bagItems
-    .filter(i => selected.includes(i.id))
-    .reduce((sum, i) => sum + i.points_spent, 0)
+  // ระบบเดิม: ยืนยันจัดส่ง = ส่งของทั้งหมดในกระเป๋าพร้อมกัน 1 รอบ (ไม่เลือกทีละชิ้น)
+  const totalPoints = bagItems.reduce((sum, i) => sum + i.points_used * (i.qty || 1), 0)
 
-  function toggle(id: string) {
-    setSelected(sel => sel.includes(id) ? sel.filter(x => x !== id) : [...sel, id])
-  }
+  useEffect(() => {
+    supabase.from('settings').select('value').eq('key', 'redeem_free_shipping_threshold').single()
+      .then(({ data }) => { if (data) setFreeThreshold(Number(data.value)) })
+  }, [])
+
+  const isFreeShipping = totalPoints >= freeThreshold
+  const pointsToFree = Math.max(0, freeThreshold - totalPoints)
 
   if (bagItems.length === 0) {
     return (
@@ -153,52 +156,49 @@ function BagSection({ userId, bagItems, onChanged }: {
   return (
     <div>
       <p className="text-xs text-gray-500 mb-3">
-        เลือกของที่จะให้จัดส่งพร้อมกัน ดองรวมกันได้หลายชิ้นเพื่อประหยัดค่าส่ง
+        ของทั้งหมดในกระเป๋าจะถูกจัดส่งพร้อมกันในรอบเดียว สะสมให้ครบ {freeThreshold} แต้มเพื่อส่งฟรี
       </p>
+
+      <div className={`rounded-xl p-3 mb-3 text-sm ${isFreeShipping ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
+        {isFreeShipping
+          ? '🎉 ครบเกณฑ์ส่งฟรีแล้ว ไม่ต้องแนบสลิปค่าส่ง'
+          : `✨ ${totalPoints}/${freeThreshold} แต้ม — แลกเพิ่มอีก ${pointsToFree} แต้ม เพื่อส่งฟรี`}
+      </div>
+
       <div className="space-y-2">
         {bagItems.map(item => (
-          <label
+          <div
             key={item.id}
-            className={`flex items-center gap-3 bg-white rounded-xl border p-3 cursor-pointer transition-colors ${
-              selected.includes(item.id) ? 'border-amber-400 bg-amber-50' : 'border-gray-100'
-            }`}
+            className="flex items-center gap-3 bg-white rounded-xl border border-gray-100 p-3"
           >
-            <input
-              type="checkbox"
-              checked={selected.includes(item.id)}
-              onChange={() => toggle(item.id)}
-              className="w-4 h-4 accent-amber-500"
-            />
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-800 truncate">{item.item_description}</p>
+              <p className="text-sm font-medium text-gray-800 truncate">{item.item_name}</p>
               <p className="text-xs text-gray-400">
-                {item.quantity > 1 ? `จำนวน ${item.quantity} · ` : ''}
+                {item.qty > 1 ? `จำนวน ${item.qty} · ` : ''}
                 {new Date(item.created_at).toLocaleDateString('th-TH')}
               </p>
             </div>
-            <span className="text-sm font-semibold text-amber-600 whitespace-nowrap">✨ {item.points_spent}</span>
-          </label>
+            <span className="text-sm font-semibold text-amber-600 whitespace-nowrap">✨ {item.points_used * (item.qty || 1)}</span>
+          </div>
         ))}
       </div>
 
       <div className="sticky bottom-4 mt-6">
         <button
           onClick={() => setShowConfirm(true)}
-          disabled={selected.length === 0}
-          className="w-full py-3 rounded-xl bg-amber-500 text-white font-medium hover:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed shadow-lg"
+          className="w-full py-3 rounded-xl bg-amber-500 text-white font-medium hover:bg-amber-600 shadow-lg"
         >
-          {selected.length === 0 ? 'เลือกของที่จะส่งก่อน' : `ยืนยันจัดส่ง ${selected.length} ชิ้น (✨ ${totalPoints})`}
+          {`จัดส่งของทั้งหมด ${bagItems.length} ชิ้น (✨ ${totalPoints})`}
         </button>
       </div>
 
       {showConfirm && (
         <ConfirmShipmentModal
           userId={userId}
-          redemptionIds={selected}
+          totalPoints={totalPoints}
           onClose={() => setShowConfirm(false)}
           onConfirmed={() => {
             setShowConfirm(false)
-            setSelected([])
             onChanged()
           }}
         />
@@ -207,16 +207,18 @@ function BagSection({ userId, bagItems, onChanged }: {
   )
 }
 
-function ConfirmShipmentModal({ userId, redemptionIds, onClose, onConfirmed }: {
+function ConfirmShipmentModal({ userId, totalPoints, onClose, onConfirmed }: {
   userId: string
-  redemptionIds: string[]
+  totalPoints: number
   onClose: () => void
   onConfirmed: () => void
 }) {
   const [addresses, setAddresses] = useState<any[]>([])
   const [selectedAddress, setSelectedAddress] = useState('')
   const [shippingFee, setShippingFee] = useState(0)
+  const [freeThreshold, setFreeThreshold] = useState(40)
   const [slipFile, setSlipFile] = useState<File | null>(null)
+  const [isMergeOrder, setIsMergeOrder] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [loadingAddr, setLoadingAddr] = useState(true)
@@ -224,14 +226,18 @@ function ConfirmShipmentModal({ userId, redemptionIds, onClose, onConfirmed }: {
   useEffect(() => {
     Promise.all([
       supabase.from('shipping_addresses').select('*').eq('customer_id', userId).order('is_default', { ascending: false }),
-      supabase.from('settings').select('value').eq('key', 'shipping_fee').single()
-    ]).then(([{ data: addrs }, { data: settings }]) => {
+      supabase.from('settings').select('value').eq('key', 'shipping_fee').single(),
+      supabase.from('settings').select('value').eq('key', 'redeem_free_shipping_threshold').single()
+    ]).then(([{ data: addrs }, { data: settings }, { data: thresholdSetting }]) => {
       setAddresses(addrs ?? [])
       if (addrs?.length) setSelectedAddress(addrs.find((a: any) => a.is_default)?.id || addrs[0].id)
       if (settings) setShippingFee(Number(settings.value))
+      if (thresholdSetting) setFreeThreshold(Number(thresholdSetting.value))
       setLoadingAddr(false)
     })
   }, [userId])
+
+  const isFreeShipping = totalPoints >= freeThreshold
 
   async function handleConfirm() {
     if (!selectedAddress) return
@@ -253,11 +259,10 @@ function ConfirmShipmentModal({ userId, redemptionIds, onClose, onConfirmed }: {
       slipUrl = uploadData.url
     }
 
-    const { error: rpcError } = await supabase.rpc('confirm_shipment', {
-      p_redemption_ids: redemptionIds,
+    const { error: rpcError } = await supabase.rpc('bridge_bag_to_history', {
       p_shipping_address_id: selectedAddress,
-      p_shipping_fee: shippingFee,
-      p_slip_url: slipUrl
+      p_slip_url: slipUrl,
+      p_is_merge_order: isMergeOrder
     })
 
     setSubmitting(false)
@@ -291,6 +296,15 @@ function ConfirmShipmentModal({ userId, redemptionIds, onClose, onConfirmed }: {
             </div>
           ) : (
             <div>
+              <label className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg p-3 mb-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isMergeOrder}
+                  onChange={e => setIsMergeOrder(e.target.checked)}
+                  className="w-4 h-4 accent-amber-500"
+                />
+                <span className="text-sm text-gray-700">📦 ฝากส่งรวมกับออเดอร์อื่น (ที่เคยสั่งไว้)</span>
+              </label>
               <p className="text-xs text-gray-500 font-medium mb-2">ที่อยู่จัดส่ง</p>
               <div className="space-y-2">
                 {addresses.map(addr => (
@@ -315,12 +329,14 @@ function ConfirmShipmentModal({ userId, redemptionIds, onClose, onConfirmed }: {
             </div>
           )}
 
-          <div className="flex items-center justify-between text-sm bg-gray-50 rounded-lg px-3 py-2">
-            <span className="text-gray-500">ค่าจัดส่ง</span>
-            <span className="font-semibold text-gray-700">{shippingFee > 0 ? `฿${shippingFee}` : 'ฟรี'}</span>
+          <div className={`flex items-center justify-between text-sm rounded-lg px-3 py-2 ${isFreeShipping ? 'bg-green-50 text-green-700' : 'bg-gray-50'}`}>
+            <span className={isFreeShipping ? 'text-green-700' : 'text-gray-500'}>ค่าจัดส่ง</span>
+            <span className="font-semibold">
+              {isFreeShipping ? `🎉 ฟรี (แลกครบ ${freeThreshold} แต้ม)` : shippingFee > 0 ? `฿${shippingFee}` : 'ต้องแนบสลิป'}
+            </span>
           </div>
 
-          {shippingFee > 0 && (
+          {!isFreeShipping && (
             <div>
               <p className="text-xs text-gray-500 font-medium mb-2">แนบสลิปโอนค่าจัดส่ง</p>
               <input
@@ -340,7 +356,7 @@ function ConfirmShipmentModal({ userId, redemptionIds, onClose, onConfirmed }: {
         <div className="p-5 border-t">
           <button
             onClick={handleConfirm}
-            disabled={!selectedAddress || submitting || (shippingFee > 0 && !slipFile)}
+            disabled={!selectedAddress || submitting || (!isFreeShipping && !slipFile)}
             className="w-full py-3 rounded-xl bg-amber-500 text-white font-medium hover:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {submitting ? 'กำลังยืนยัน...' : 'ยืนยันจัดส่ง'}

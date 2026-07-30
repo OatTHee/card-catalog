@@ -99,9 +99,13 @@ function RedeemModal({ product, variants, myPoints, onClose, onRedeemed }: {
     setSubmitting(true)
     setError('')
 
-    const { data, error: rpcError } = await supabase.rpc('redeem_item', {
-      p_variant_id: selectedVariant.id,
-      p_quantity: quantity
+    const { data, error: rpcError } = await supabase.rpc('redeem_to_bag', {
+      p_items: [{
+        variant_id: selectedVariant.id,
+        item_name: `${product.name} - ${selectedVariant.name}`,
+        points: selectedVariant.redeem_points,
+        qty: quantity
+      }]
     })
 
     setSubmitting(false)

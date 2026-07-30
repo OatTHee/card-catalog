@@ -39,10 +39,10 @@ return () => {
 
   async function loadBagCount(userId: string) {
     const { count } = await supabase
-      .from('redemptions')
+      .from('bag')
       .select('id', { count: 'exact', head: true })
       .eq('customer_id', userId)
-      .eq('status', 'in_bag')
+      .eq('status', 'In Bag')
     setBagCount(count ?? 0)
   }
 
