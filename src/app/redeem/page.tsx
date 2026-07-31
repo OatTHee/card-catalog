@@ -249,7 +249,12 @@ function ConfirmShipmentModal({ userId, totalPoints, onClose, onConfirmed }: {
       const formData = new FormData()
       formData.append('file', slipFile)
       formData.append('prefix', 'redeem-slips/')
-      const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData })
+      const { data: { session: uploadSession } } = await supabase.auth.getSession()
+      const uploadRes = await fetch('/api/upload', {
+        method: 'POST',
+        headers: uploadSession?.access_token ? { Authorization: `Bearer ${uploadSession.access_token}` } : undefined,
+        body: formData
+      })
       if (!uploadRes.ok) {
         setError('อัปโหลดสลิปไม่สำเร็จ')
         setSubmitting(false)

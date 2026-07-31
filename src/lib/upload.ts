@@ -1,3 +1,10 @@
+import { createClient } from '@supabase/supabase-js'
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+)
+
 export async function compressImage(file: File, maxWidthPx = 800): Promise<Blob> {
   return new Promise((resolve) => {
     const img = new window.Image()
@@ -20,7 +27,12 @@ export async function uploadImage(file: File): Promise<string | null> {
   formData.append('file', compressed, `${Date.now()}.webp`)
   formData.append('prefix', 'products/')
 
-  const res = await fetch('/api/upload', { method: 'POST', body: formData })
+  const { data: { session } } = await supabase.auth.getSession()
+  const res = await fetch('/api/upload', {
+    method: 'POST',
+    headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : undefined,
+    body: formData
+  })
 
   if (!res.ok) {
     console.error('upload error:', await res.text())

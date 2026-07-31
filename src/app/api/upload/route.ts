@@ -1,8 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 import { uploadToR2 } from '@/lib/r2'
+
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
 export async function POST(req: NextRequest) {
   try {
+    // ต้อง login ก่อนถึงจะอัปโหลดได้ (กันสแปม/เปลือง storage จากคนนอกที่ไม่ login)
+    // ใช้ได้ทั้งแอดมิน (อัปรูปสินค้า) และลูกค้าทั่วไป (อัปสลิปตอนเช็คเอาท์/แลกของ)
+    const token = (req.headers.get('authorization') || '').replace('Bearer ', '')
+    if (!token) {
+      return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+    }
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token)
+    if (authError || !user) {
+      return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+    }
+
     const formData = await req.formData()
     const file = formData.get('file') as File | null
     const prefix = (formData.get('prefix') as string) || ''

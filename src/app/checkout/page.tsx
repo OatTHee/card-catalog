@@ -84,7 +84,11 @@ export default function CheckoutPage() {
     slipFormData.append('file', resizedFile, resizedFile.name)
     slipFormData.append('prefix', 'slips/')
 
-    const uploadRes = await fetch('/api/upload', { method: 'POST', body: slipFormData })
+    const uploadRes = await fetch('/api/upload', {
+      method: 'POST',
+      headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : undefined,
+      body: slipFormData
+    })
     if (!uploadRes.ok) { alert('อัปโหลดสลิปไม่สำเร็จ'); setSubmitting(false); return }
     const { url: slipUrl } = await uploadRes.json()
 
