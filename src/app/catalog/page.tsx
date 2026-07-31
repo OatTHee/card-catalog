@@ -18,6 +18,7 @@ async function getProducts() {
  const { data: products } = await supabase
   .from('products')
   .select('*')
+  .eq('is_for_sale', true)
   .order('sort_order', { ascending: true })
 
 const { data: variants } = await supabase
