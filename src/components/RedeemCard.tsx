@@ -85,6 +85,7 @@ function RedeemModal({ product, variants, myPoints, onClose, onRedeemed }: {
   const [selectedVariantId, setSelectedVariantId] = useState(variants[0]?.id ?? '')
   const [quantity, setQuantity] = useState(1)
   const [submitting, setSubmitting] = useState(false)
+  const [confirming, setConfirming] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
 
@@ -158,7 +159,7 @@ function RedeemModal({ product, variants, myPoints, onClose, onRedeemed }: {
               {variants.map((v: any) => (
                 <button
                   key={v.id}
-                  onClick={() => setSelectedVariantId(v.id)}
+                  onClick={() => { setSelectedVariantId(v.id); setConfirming(false) }}
                   disabled={v.stock === 0}
                   className={`w-full flex justify-between items-center px-3 py-2 rounded-lg border text-sm transition-colors ${
                     selectedVariantId === v.id
@@ -190,12 +191,12 @@ function RedeemModal({ product, variants, myPoints, onClose, onRedeemed }: {
               <span className="text-xs text-gray-500 font-medium">จำนวน</span>
               <div className="flex items-center border border-gray-200 rounded-lg">
                 <button
-                  onClick={() => setQuantity(q => Math.max(1, q - 1))}
+                  onClick={() => { setQuantity(q => Math.max(1, q - 1)); setConfirming(false) }}
                   className="w-8 h-8 text-gray-500 hover:bg-gray-50"
                 >−</button>
                 <span className="w-10 text-center text-sm">{quantity}</span>
                 <button
-                  onClick={() => setQuantity(q => Math.min(selectedVariant?.stock ?? 1, q + 1))}
+                  onClick={() => { setQuantity(q => Math.min(selectedVariant?.stock ?? 1, q + 1)); setConfirming(false) }}
                   className="w-8 h-8 text-gray-500 hover:bg-gray-50"
                 >+</button>
               </div>
@@ -228,15 +229,39 @@ function RedeemModal({ product, variants, myPoints, onClose, onRedeemed }: {
               <button disabled className="w-full py-3 rounded-xl bg-gray-100 text-gray-400 cursor-not-allowed">
                 แต้มไม่พอ
               </button>
+            ) : success ? (
+              <button disabled className="w-full py-3 rounded-xl font-medium bg-green-500 text-white">
+                ✓ แลกสำเร็จ เข้ากระเป๋าแล้ว
+              </button>
+            ) : confirming ? (
+              <div className="space-y-2">
+                <div className="text-center text-sm text-gray-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  ยืนยันแลก <span className="font-semibold">{product.name}</span> ใช้ <span className="font-semibold text-amber-600">{totalPoints.toLocaleString()} แต้ม</span>?
+                  <br />แต้มจะถูกตัดทันทีและคืนไม่ได้
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setConfirming(false)}
+                    disabled={submitting}
+                    className="flex-1 py-3 rounded-xl font-medium border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-60"
+                  >
+                    ยกเลิก
+                  </button>
+                  <button
+                    onClick={handleRedeem}
+                    disabled={submitting}
+                    className="flex-1 py-3 rounded-xl font-medium bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-60"
+                  >
+                    {submitting ? 'กำลังแลก...' : 'ยืนยันแลก'}
+                  </button>
+                </div>
+              </div>
             ) : (
               <button
-                onClick={handleRedeem}
-                disabled={submitting}
-                className={`w-full py-3 rounded-xl font-medium transition-colors ${
-                  success ? 'bg-green-500 text-white' : 'bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-60'
-                }`}
+                onClick={() => { setError(''); setConfirming(true) }}
+                className="w-full py-3 rounded-xl font-medium bg-amber-500 text-white hover:bg-amber-600 transition-colors"
               >
-                {success ? '✓ แลกสำเร็จ เข้ากระเป๋าแล้ว' : submitting ? 'กำลังแลก...' : 'แลกเลย'}
+                แลกเลย
               </button>
             )}
           </div>

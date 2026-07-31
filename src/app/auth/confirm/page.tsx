@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { createClient } from '@supabase/supabase-js'
 
 const supabase = createClient(
@@ -9,9 +9,17 @@ const supabase = createClient(
 )
 
 export default function ConfirmPage() {
+  // กัน onAuthStateChange ยิงซ้ำ (Supabase อาจ fire หลาย event เช่น INITIAL_SESSION
+  // แล้วตามด้วย SIGNED_IN ในช่วงเวลาไล่เลี่ยกัน) ถ้าไม่กัน claim_legacy_account จะถูกเรียก
+  // พร้อมกันหลายครั้ง เกิด race condition เครดิตแต้ม/EXP ซ้ำได้ (เจอเคสจริงมาแล้ว)
+  const handledRef = useRef(false)
+
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
+        if (handledRef.current) return
+        handledRef.current = true
+
         await supabase.from('customers').upsert({
           id: session.user.id,
           display_name: session.user.user_metadata?.full_name || session.user.user_metadata?.username,
