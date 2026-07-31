@@ -491,7 +491,13 @@ if (validVariants.length > 0) {
               <option value="set">เซ็ต</option>
               <option value="single">การ์ดแยกใบ</option>
               <option value="accessory">อุปกรณ์เสริม</option>
+              <option value="gacha">ซองสุ่ม</option>
             </select>
+            {type === 'gacha' && (
+              <p className="text-xs text-purple-700 mt-1">
+                🎁 บันทึกสินค้านี้ก่อน แล้วเข้าไปแก้ไข (แก้ไขสินค้า) เพื่อตั้งค่ารางวัลของแต่ละ variant
+              </p>
+            )}
           </div>
 
           <div>
@@ -646,6 +652,7 @@ const [imagePreview, setImagePreview] = useState<string>(product.image_url ?? ''
   const [saving, setSaving] = useState(false)
   const [isForSale, setIsForSale] = useState(product.is_for_sale ?? true)
   const [isForRedeem, setIsForRedeem] = useState(product.is_for_redeem ?? false)
+  const [gachaConfigVariant, setGachaConfigVariant] = useState<any>(null)
 function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
   const file = e.target.files?.[0]
   if (!file) return
@@ -743,6 +750,7 @@ function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
               <option value="set">เซ็ต</option>
               <option value="single">การ์ดแยกใบ</option>
               <option value="accessory">อุปกรณ์เสริม</option>
+              <option value="gacha">ซองสุ่ม</option>
             </select>
           </div>
 
@@ -795,6 +803,11 @@ function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     />
   )}
 </div>
+          {type === 'gacha' && (
+            <div className="border border-purple-300 bg-purple-50 rounded-lg p-3 text-sm text-purple-800">
+              🎁 สินค้าประเภทซองสุ่ม: บันทึก variant ให้เสร็จก่อน แล้วกด "⚙️ ตั้งค่าซองสุ่ม" ที่แต่ละ variant ด้านล่างเพื่อกำหนดจำนวนเลขต่อซองและรางวัล
+            </div>
+          )}
           <div>
             <div className="flex justify-between items-center mb-2">
               <label className="text-sm text-gray-600">Variants</label>
@@ -840,6 +853,14 @@ function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
         className="w-full text-xs"
       />
     </div>
+    {type === 'gacha' && (
+      <button
+        onClick={() => setGachaConfigVariant(v)}
+        className="text-xs bg-purple-100 text-purple-700 border border-purple-300 rounded px-2 py-1 hover:bg-purple-200"
+      >
+        ⚙️ ตั้งค่าซองสุ่ม
+      </button>
+    )}
   </div>
 ))}
             {newVariants.map((v, i) => (
@@ -898,6 +919,221 @@ function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
             className="flex-1 border py-2 rounded text-sm hover:bg-gray-50"
           >
             ยกเลิก
+          </button>
+        </div>
+      </div>
+      {gachaConfigVariant && (
+        <GachaConfigModal
+          variant={gachaConfigVariant}
+          onClose={() => setGachaConfigVariant(null)}
+        />
+      )}
+    </div>
+  )
+}
+function GachaConfigModal({ variant, onClose }: {
+  variant: any,
+  onClose: () => void
+}) {
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [configId, setConfigId] = useState<string | null>(null)
+  const [rollsPerPack, setRollsPerPack] = useState('1')
+  const [prizes, setPrizes] = useState<any[]>([])
+
+  useEffect(() => {
+    loadConfig()
+  }, [])
+
+  async function loadConfig() {
+    setLoading(true)
+    const { data: config } = await supabase
+      .from('gacha_configs')
+      .select('*')
+      .eq('variant_id', variant.id)
+      .maybeSingle()
+
+    if (config) {
+      setConfigId(config.id)
+      setRollsPerPack(String(config.rolls_per_pack ?? 1))
+      const { data: prizeRows } = await supabase
+        .from('gacha_prizes')
+        .select('*')
+        .eq('gacha_config_id', config.id)
+        .order('sort_order', { ascending: true })
+      setPrizes(
+        (prizeRows ?? []).map(p => ({
+          id: p.id,
+          label: p.label,
+          image_url: p.image_url ?? '',
+          weight: String(p.weight),
+          is_jackpot: p.is_jackpot
+        }))
+      )
+    }
+    setLoading(false)
+  }
+
+  function addPrizeRow() {
+    setPrizes([...prizes, { label: '', image_url: '', weight: '1', is_jackpot: false }])
+  }
+
+  function updatePrize(index: number, field: string, value: any) {
+    const updated = [...prizes]
+    updated[index] = { ...updated[index], [field]: value }
+    setPrizes(updated)
+  }
+
+  function removePrize(index: number) {
+    setPrizes(prizes.filter((_, i) => i !== index))
+  }
+
+  const totalWeight = prizes.reduce((sum, p) => sum + (Number(p.weight) || 0), 0)
+
+  async function handleSave() {
+    const validPrizes = prizes.filter(p => p.label && Number(p.weight) > 0)
+    if (validPrizes.length === 0) {
+      alert('ต้องมีรางวัลอย่างน้อย 1 รายการ')
+      return
+    }
+    setSaving(true)
+
+    let cfgId = configId
+    if (!cfgId) {
+      const { data: inserted, error } = await supabase
+        .from('gacha_configs')
+        .insert({ variant_id: variant.id, rolls_per_pack: Number(rollsPerPack) || 1 })
+        .select()
+        .single()
+      if (error || !inserted) {
+        setSaving(false)
+        alert('บันทึกไม่สำเร็จ: ' + (error?.message ?? 'unknown error'))
+        return
+      }
+      cfgId = inserted.id
+      setConfigId(cfgId)
+    } else {
+      await supabase
+        .from('gacha_configs')
+        .update({ rolls_per_pack: Number(rollsPerPack) || 1 })
+        .eq('id', cfgId)
+    }
+
+    // simplest-correct approach: replace the whole prize list
+    await supabase.from('gacha_prizes').delete().eq('gacha_config_id', cfgId)
+    await supabase.from('gacha_prizes').insert(
+      validPrizes.map((p, i) => ({
+        gacha_config_id: cfgId,
+        label: p.label,
+        image_url: p.image_url || null,
+        weight: Number(p.weight),
+        is_jackpot: !!p.is_jackpot,
+        sort_order: i
+      }))
+    )
+
+    setSaving(false)
+    onClose()
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[60]">
+      <div className="bg-white rounded-lg w-full max-w-lg max-h-screen overflow-y-auto p-6">
+        <h2 className="text-lg font-bold mb-1">⚙️ ตั้งค่าซองสุ่ม</h2>
+        <p className="text-sm text-gray-500 mb-4">{variant.name}</p>
+
+        {loading ? (
+          <p className="text-sm text-gray-400">กำลังโหลด...</p>
+        ) : (
+          <>
+            <div className="mb-4">
+              <label className="text-sm text-gray-600">จำนวนเลขที่สุ่มต่อ 1 ซอง (rolls per pack)</label>
+              <input
+                type="number"
+                min={1}
+                value={rollsPerPack}
+                onChange={e => setRollsPerPack(e.target.value)}
+                className="w-full border rounded px-3 py-2 text-sm mt-1"
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                เช่น 1 ซอง 1 เลข ใส่ 1 / 1 ซอง 3 เลข ใส่ 3 (สุ่มแบบสุ่มซ้ำได้ในกล่องรางวัลเดียวกัน)
+              </p>
+            </div>
+
+            <div className="flex justify-between items-center mb-2">
+              <label className="text-sm text-gray-600">รางวัลในกล่องสุ่ม (น้ำหนัก = โอกาสออก)</label>
+              <button onClick={addPrizeRow} className="text-xs text-blue-500 hover:text-blue-700">
+                + เพิ่มรางวัล
+              </button>
+            </div>
+
+            {prizes.map((p, i) => {
+              const pct = totalWeight > 0 ? ((Number(p.weight) || 0) / totalWeight * 100).toFixed(1) : '0.0'
+              return (
+                <div key={p.id ?? i} className="border rounded-lg p-2 mb-2 space-y-2">
+                  <div className="flex gap-2 items-center">
+                    <input
+                      value={p.label}
+                      onChange={e => updatePrize(i, 'label', e.target.value)}
+                      placeholder="ชื่อรางวัล / เลขที่ได้"
+                      className="flex-1 border rounded px-2 py-1 text-sm"
+                    />
+                    <input
+                      value={p.weight}
+                      onChange={e => updatePrize(i, 'weight', e.target.value)}
+                      type="number"
+                      min={0}
+                      placeholder="น้ำหนัก"
+                      className="w-20 border rounded px-2 py-1 text-sm"
+                    />
+                    <span className="text-xs text-gray-400 w-14 text-right">{pct}%</span>
+                    <button onClick={() => removePrize(i)} className="text-red-400 text-sm">✕</button>
+                  </div>
+                  <div className="flex gap-3 items-center">
+                    <label className="flex items-center gap-1 text-xs text-yellow-700">
+                      <input
+                        type="checkbox"
+                        checked={!!p.is_jackpot}
+                        onChange={e => updatePrize(i, 'is_jackpot', e.target.checked)}
+                      />
+                      🌟 แจ็คพอต
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={async e => {
+                        const file = e.target.files?.[0]
+                        if (!file) return
+                        const url = await uploadImage(file)
+                        if (url) updatePrize(i, 'image_url', url)
+                      }}
+                      className="flex-1 text-xs"
+                    />
+                  </div>
+                  {p.image_url && <img src={p.image_url} className="h-12 object-cover rounded" />}
+                </div>
+              )
+            })}
+
+            {prizes.length > 0 && (
+              <p className="text-xs text-gray-400 mb-2">น้ำหนักรวม: {totalWeight}</p>
+            )}
+          </>
+        )}
+
+        <div className="flex gap-2 mt-4">
+          <button
+            onClick={handleSave}
+            disabled={saving || loading}
+            className="flex-1 bg-purple-500 text-white py-2 rounded text-sm hover:bg-purple-600 disabled:opacity-50"
+          >
+            {saving ? 'กำลังบันทึก...' : 'บันทึก'}
+          </button>
+          <button
+            onClick={onClose}
+            className="flex-1 border py-2 rounded text-sm hover:bg-gray-50"
+          >
+            ปิด
           </button>
         </div>
       </div>
