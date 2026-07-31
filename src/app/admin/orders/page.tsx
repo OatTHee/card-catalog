@@ -65,6 +65,7 @@ export default function AdminOrdersPage() {
         <div className="max-w-5xl mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-4">
             <a href="/admin" className="text-blue-500 text-sm">← จัดการสินค้า</a>
+            <a href="/admin/redeems" className="text-amber-500 text-sm">จัดการการแลก</a>
             <a href="/admin/players" className="text-purple-500 text-sm">จัดการแต้ม/EXP</a>
             <h1 className="font-bold text-gray-800">จัดการ Order</h1>
           </div>

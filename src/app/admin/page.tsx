@@ -177,6 +177,10 @@ async function handleVariantDragEnd(event: DragEndEvent, productId: string) {
   className="text-sm bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
   จัดการ Order
 </a>
+<a href="/admin/redeems"
+  className="text-sm bg-amber-500 text-white px-4 py-2 rounded hover:bg-amber-600">
+  จัดการการแลก
+</a>
 <a href="/admin/players"
   className="text-sm bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600">
   จัดการแต้ม/EXP

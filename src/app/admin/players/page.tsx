@@ -309,6 +309,8 @@ export default function AdminPlayersPage() {
         <div className="max-w-5xl mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-4">
             <a href="/admin" className="text-blue-500 text-sm">← จัดการสินค้า</a>
+            <a href="/admin/orders" className="text-green-600 text-sm">จัดการ Order</a>
+            <a href="/admin/redeems" className="text-amber-500 text-sm">จัดการการแลก</a>
             <h1 className="font-bold text-gray-800">จัดการแต้ม / EXP ผู้เล่น</h1>
           </div>
           <button onClick={handleLogout} className="text-sm text-gray-500 hover:text-red-500">
