@@ -20,6 +20,9 @@ export default function ConfirmPage() {
         if (handledRef.current) return
         handledRef.current = true
 
+        // discord_id ถูกเติมอัตโนมัติโดย trigger ฝั่ง DB (trg_sync_discord_id บน auth.users
+        // และ trg_fill_discord_id_on_customer_insert บน customers) — ห้ามส่งมาจากตรงนี้
+        // เพราะ client แก้ค่าเองได้ และ upsert จะทับค่าที่ได้จากการเคลมบัญชีเก่า
         await supabase.from('customers').upsert({
           id: session.user.id,
           display_name: session.user.user_metadata?.full_name || session.user.user_metadata?.username,
