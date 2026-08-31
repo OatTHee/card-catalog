@@ -185,6 +185,10 @@ async function handleVariantDragEnd(event: DragEndEvent, productId: string) {
   className="text-sm bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600">
   จัดการแต้ม/EXP
 </a>
+<a href="/admin/managebag"
+  className="text-sm bg-teal-500 text-white px-4 py-2 rounded hover:bg-teal-600">
+  จัดการกระเป๋า
+</a>
     <button
       onClick={handleLogout}
       className="text-sm text-gray-500 hover:text-red-500"
