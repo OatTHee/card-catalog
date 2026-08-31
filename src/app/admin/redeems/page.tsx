@@ -68,6 +68,7 @@ export default function AdminRedeemsPage() {
             <a href="/admin" className="text-blue-500 text-sm">← จัดการสินค้า</a>
             <a href="/admin/orders" className="text-blue-500 text-sm">จัดการ Order</a>
             <a href="/admin/players" className="text-purple-500 text-sm">จัดการแต้ม/EXP</a>
+            <a href="/admin/managebag" className="text-teal-600 text-sm">จัดการกระเป๋า</a>
             <h1 className="font-bold text-gray-800">จัดการการแลก</h1>
           </div>
           <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
