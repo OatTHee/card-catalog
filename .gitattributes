@@ -1,0 +1,13 @@
+# ให้ทุกไฟล์ข้อความเก็บใน repo เป็น LF เสมอ กัน diff บวมจาก CRLF บน Windows
+* text=auto eol=lf
+
+# ไฟล์ไบนารี อย่าไปยุ่งกับ line ending
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.pdf binary
