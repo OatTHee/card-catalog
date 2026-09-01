@@ -92,47 +92,45 @@ export default function CheckoutPage() {
     if (!uploadRes.ok) { alert('อัปโหลดสลิปไม่สำเร็จ'); setSubmitting(false); return }
     const { url: slipUrl } = await uploadRes.json()
 
-    const subtotal = cart.reduce((sum, i) => sum + i.price * i.quantity, 0)
-    const { data: order, error: orderError } = await supabase.from('orders').insert({
-      customer_id: session.user.id,
-      shipping_address_id: selectedAddress,
-      subtotal,
-      shipping_fee: shippingFee,
-      total: subtotal + shippingFee,
-      slip_url: slipUrl,
-      status: 'pending_payment'
-    }).select().single()
+    // สร้างออเดอร์ + ตัดสต็อก ในทรานแซกชันเดียวฝั่ง DB
+    // (RPC เป็น SECURITY DEFINER จึงข้าม RLS ของ product_variants ได้ และล็อกแถวกัน oversell)
+    const { data: result, error: rpcError } = await supabase.rpc('place_order', {
+      p_shipping_address_id: selectedAddress,
+      p_items: cart.map(i => ({
+        variant_id: i.variantId,
+        quantity: i.quantity,
+        name: `${i.productName} - ${i.variantName}`
+      })),
+      p_slip_url: slipUrl
+    })
 
-    if (orderError || !order) { alert('เกิดข้อผิดพลาด'); setSubmitting(false); return }
-
-    for (const item of cart) {
-      await supabase.from('order_items').insert({
-        order_id: order.id,
-        variant_id: item.variantId,
-        name: `${item.productName} - ${item.variantName}`,
-        price: item.price,
-        quantity: item.quantity
-      })
-      await supabase.rpc('decrement_stock', { variant_id: item.variantId, amount: item.quantity })
+    if (rpcError || !result?.order_id) {
+      alert(rpcError?.message || 'สั่งซื้อไม่สำเร็จ ลองใหม่อีกครั้ง')
+      setSubmitting(false)
+      return
     }
+
+    const orderId = result.order_id as string
+    const orderTotal = Number(result.total)
 
     clearCart()
     await fetch('/api/notify', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-  orderId: order.id,
-  customerName: session.user.user_metadata?.full_name || session.user.user_metadata?.username,
-  items: cart.map(i => ({ name: `${i.productName} - ${i.variantName}`, quantity: i.quantity, price: i.price })),
-  total: subtotal + shippingFee,
-  slipUrl: slipUrl,
-address: (() => {
-  const addr = addresses.find(a => a.id === selectedAddress)
-  if (!addr) return 'ไม่ระบุ'
-  return `${addr.name} | ${addr.phone}\n${addr.address} ${addr.district} ${addr.province} ${addr.postal_code}`
-})(),})
-})
-    window.location.href = `/orders/${order.id}`
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        orderId,
+        customerName: session.user.user_metadata?.full_name || session.user.user_metadata?.username,
+        items: cart.map(i => ({ name: `${i.productName} - ${i.variantName}`, quantity: i.quantity, price: i.price })),
+        total: orderTotal,
+        slipUrl: slipUrl,
+        address: (() => {
+          const addr = addresses.find(a => a.id === selectedAddress)
+          if (!addr) return 'ไม่ระบุ'
+          return `${addr.name} | ${addr.phone}\n${addr.address} ${addr.district} ${addr.province} ${addr.postal_code}`
+        })(),
+      })
+    })
+    window.location.href = `/orders/${orderId}`
   }
 
   const subtotal = cart.reduce((sum, i) => sum + i.price * i.quantity, 0)
