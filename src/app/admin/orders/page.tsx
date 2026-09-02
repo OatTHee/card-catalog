@@ -36,10 +36,20 @@ export default function AdminOrdersPage() {
     const ordersWithItems = await Promise.all((ordersData ?? []).map(async order => {
       const { data: items } = await supabase.from('order_items').select('*').eq('order_id', order.id)
       const { data: addr } = await supabase.from('shipping_addresses').select('*').eq('id', order.shipping_address_id).single()
-      return { ...order, items: items ?? [], address: addr }
+      const all = items ?? []
+      const hasPre = all.some((i: any) => i.is_preorder)
+      const hasNormal = all.some((i: any) => !i.is_preorder)
+      // แยกส่ง 2 รอบ = มีทั้งของพรีและของพร้อมส่ง และลูกค้าไม่ได้ติ๊กให้ส่งพร้อมกัน
+      const isSplit = hasPre && hasNormal && !order.ship_together
+      return { ...order, items: all, address: addr, hasPre, hasNormal, isSplit }
     }))
 
-    setOrders(ordersWithItems)
+    // หน้านี้ดูแลเฉพาะ "ของพร้อมส่ง"
+    //   ออเดอร์ที่เป็นของพรีล้วน -> ไปหน้า /admin/preorders
+    //   ออเดอร์ปนกันที่ลูกค้าติ๊กให้ส่งพร้อมของพรี -> ไปหน้า /admin/preorders ทั้งออเดอร์
+    const visible = ordersWithItems.filter(o => o.hasNormal && !(o.hasPre && o.ship_together))
+
+    setOrders(visible)
     setLoading(false)
   }
 
@@ -65,6 +75,7 @@ export default function AdminOrdersPage() {
         <div className="max-w-5xl mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-4">
             <a href="/admin" className="text-blue-500 text-sm">← จัดการสินค้า</a>
+            <a href="/admin/preorders" className="text-orange-500 text-sm">จัดการ Pre-order</a>
             <a href="/admin/redeems" className="text-amber-500 text-sm">จัดการการแลก</a>
             <a href="/admin/players" className="text-purple-500 text-sm">จัดการแต้ม/EXP</a>
             <a href="/admin/managebag" className="text-teal-600 text-sm">จัดการกระเป๋า</a>
@@ -96,10 +107,17 @@ export default function AdminOrdersPage() {
 
                 {/* รายการสินค้า */}
                 <div className="mt-3 space-y-1">
-                  {order.items.map((item: any) => (
+                  {(order.isSplit ? order.items.filter((i: any) => !i.is_preorder) : order.items).map((item: any) => (
                     <p key={item.id} className="text-xs text-gray-500">{item.name} x{item.quantity} — ฿{item.price * item.quantity}</p>
                   ))}
                 </div>
+                {order.isSplit && (
+                  <p className="mt-2 text-xs text-orange-600 bg-orange-50 border border-orange-100 rounded px-2 py-1">
+                    ออเดอร์นี้แยกส่ง 2 รอบ — ของพรีออเดอร์อยู่ที่หน้า{' '}
+                    <a href="/admin/preorders" className="underline font-medium">จัดการ Pre-order</a>
+                    {' '}(ยอด ฿{order.total} รวมค่าส่ง 2 รอบแล้ว)
+                  </p>
+                )}
 
                 {/* ที่อยู่ */}
                 {order.address && (

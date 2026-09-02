@@ -36,6 +36,9 @@ export default function CheckoutPage() {
   const [submitting, setSubmitting] = useState(false)
   const [session, setSession] = useState<any>(null)
   const [showQR, setShowQR] = useState(false)
+  // variantId ของสินค้าพรีออเดอร์ในตะกร้า (ดึงสดจาก DB ไม่เชื่อค่าที่ค้างใน localStorage)
+  const [preorderIds, setPreorderIds] = useState<Set<string>>(new Set())
+  const [shipTogether, setShipTogether] = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -46,14 +49,25 @@ export default function CheckoutPage() {
   }, [])
 
   async function loadData(userId: string) {
-    const [{ data: addrs }, { data: settings }] = await Promise.all([
+    const currentCart = getCart()
+    const variantIds = currentCart.map(i => i.variantId)
+
+    const [{ data: addrs }, { data: settings }, { data: variantRows }] = await Promise.all([
       supabase.from('shipping_addresses').select('*').eq('customer_id', userId).order('is_default', { ascending: false }),
-      supabase.from('settings').select('value').eq('key', 'shipping_fee').single()
+      supabase.from('settings').select('value').eq('key', 'shipping_fee').single(),
+      variantIds.length
+        ? supabase.from('product_variants').select('id, products(is_preorder)').in('id', variantIds)
+        : Promise.resolve({ data: [] as any[] })
     ])
     setAddresses(addrs ?? [])
     if (addrs?.length) setSelectedAddress(addrs.find((a: any) => a.is_default)?.id || addrs[0].id)
     if (settings) setShippingFee(Number(settings.value))
-    setCart(getCart())
+    setPreorderIds(new Set(
+      (variantRows ?? [])
+        .filter((v: any) => (Array.isArray(v.products) ? v.products[0]?.is_preorder : v.products?.is_preorder))
+        .map((v: any) => v.id as string)
+    ))
+    setCart(currentCart)
     setLoading(false)
   }
 
@@ -101,7 +115,8 @@ export default function CheckoutPage() {
         quantity: i.quantity,
         name: `${i.productName} - ${i.variantName}`
       })),
-      p_slip_url: slipUrl
+      p_slip_url: slipUrl,
+      p_ship_together: shipTogether
     })
 
     if (rpcError || !result?.order_id) {
@@ -123,6 +138,9 @@ export default function CheckoutPage() {
         items: cart.map(i => ({ name: `${i.productName} - ${i.variantName}`, quantity: i.quantity, price: i.price })),
         total: orderTotal,
         slipUrl: slipUrl,
+        hasPreorder: Boolean(result.has_preorder),
+        isSplit: Boolean(result.is_split),
+        shipTogether: shipTogether,
         address: (() => {
           const addr = addresses.find(a => a.id === selectedAddress)
           if (!addr) return 'ไม่ระบุ'
@@ -134,6 +152,12 @@ export default function CheckoutPage() {
   }
 
   const subtotal = cart.reduce((sum, i) => sum + i.price * i.quantity, 0)
+  const hasPreorder = cart.some(i => preorderIds.has(i.variantId))
+  const hasNormal = cart.some(i => !preorderIds.has(i.variantId))
+  const isMixed = hasPreorder && hasNormal
+  // ปนกันแล้วไม่ได้ติ๊กส่งพร้อม = ส่ง 2 รอบ = ค่าส่ง 2 เท่า (ฝั่ง DB คิดซ้ำอีกรอบเป็นตัวตัดสิน)
+  const effectiveShipping = isMixed && !shipTogether ? shippingFee * 2 : shippingFee
+  const grandTotal = subtotal + effectiveShipping
 
   if (loading) return <div className="min-h-screen bg-blue-50 flex items-center justify-center">กำลังโหลด...</div>
 
@@ -174,17 +198,42 @@ export default function CheckoutPage() {
           <div className="space-y-2">
             {cart.map(item => (
               <div key={item.variantId} className="flex justify-between text-sm">
-                <span className="text-gray-600">{item.productName} - {item.variantName} x{item.quantity}</span>
+                <span className="text-gray-600">
+                  {item.productName} - {item.variantName} x{item.quantity}
+                  {preorderIds.has(item.variantId) && (
+                    <span className="ml-1 text-[10px] text-orange-600 bg-orange-50 border border-orange-200 rounded px-1 py-0.5">พรีออเดอร์</span>
+                  )}
+                </span>
                 <span className="font-medium">฿{item.price * item.quantity}</span>
               </div>
             ))}
           </div>
+          {isMixed && (
+            <div className="mt-3 border border-orange-200 bg-orange-50 rounded-lg p-3">
+              <p className="text-xs text-orange-700 leading-relaxed">
+                ตะกร้านี้มีทั้งสินค้าพรีออเดอร์และสินค้าพร้อมส่ง ปกติจะแยกส่ง 2 รอบ
+                จึงคิดค่าส่ง 2 เท่า (฿{shippingFee} x 2)
+              </p>
+              <label className="flex items-start gap-2 mt-2 text-sm text-gray-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={shipTogether}
+                  onChange={e => setShipTogether(e.target.checked)}
+                  className="mt-0.5"
+                />
+                <span>
+                  รอของพรีออเดอร์ แล้วส่งมาพร้อมกันรอบเดียว
+                  <span className="text-green-600 font-medium"> (จ่ายค่าส่ง ฿{shippingFee} รอบเดียว)</span>
+                </span>
+              </label>
+            </div>
+          )}
           <div className="border-t mt-3 pt-3 space-y-1">
             <div className="flex justify-between text-sm text-gray-500">
-              <span>ค่าส่ง</span><span>฿{shippingFee}</span>
+              <span>ค่าส่ง{isMixed && !shipTogether ? ' (ส่ง 2 รอบ)' : ''}</span><span>฿{effectiveShipping}</span>
             </div>
             <div className="flex justify-between font-bold text-blue-900">
-              <span>รวม</span><span>฿{subtotal + shippingFee}</span>
+              <span>รวม</span><span>฿{grandTotal}</span>
             </div>
           </div>
         </div>
@@ -204,7 +253,7 @@ export default function CheckoutPage() {
               <p className="text-base">📱 <b>Wallet:</b> 094-7066766 (ศรัณย์)</p>
             </div>
           </div>
-          <p className="text-sm font-medium text-blue-900 mb-3">โอนเงิน ฿{subtotal + shippingFee} แล้วแนบสลิปด้านล่าง</p>
+          <p className="text-sm font-medium text-blue-900 mb-3">โอนเงิน ฿{grandTotal} แล้วแนบสลิปด้านล่าง</p>
 
           {/* อัปโหลดสลิป */}
           <input type="file" accept="image/*" onChange={handleSlipChange} className="w-full text-sm mb-3" />
