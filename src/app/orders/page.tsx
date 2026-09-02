@@ -53,7 +53,13 @@ export default function OrdersPage() {
         ) : (
           <div className="space-y-3">
             {orders.map(order => {
+  const its = order.order_items ?? []
+  const hasPre = its.some((i: any) => i.is_preorder)
+  const hasNormal = its.some((i: any) => !i.is_preorder)
+  // แยกส่ง 2 รอบ = มีทั้งของพร้อมส่งและของพรี และไม่ได้เลือกให้ส่งพร้อมกัน
+  const isSplit = hasPre && hasNormal && !order.ship_together
   const s = statusLabel[order.status]
+  const ps = statusLabel[order.preorder_status ?? 'pending_payment']
   return (
     <div key={order.id} className="bg-white rounded-xl shadow-sm p-4 space-y-3">
       <div className="flex justify-between items-start">
@@ -61,19 +67,46 @@ export default function OrdersPage() {
           <p className="text-sm font-medium text-gray-800">คำสั่งซื้อ #{order.id.slice(0, 8)}</p>
           <p className="text-xs text-gray-400">{new Date(order.created_at).toLocaleDateString('th-TH')}</p>
         </div>
-        <span className={`text-xs px-2 py-1 rounded-full ${s.color}`}>{s.label}</span>
+        <div className="flex flex-col items-end gap-1">
+          {isSplit ? (
+            <>
+              <span className={`text-xs px-2 py-1 rounded-full ${s.color}`}>ของพร้อมส่ง · {s.label}</span>
+              <span className={`text-xs px-2 py-1 rounded-full ${ps.color}`}>พรีออเดอร์ · {ps.label}</span>
+            </>
+          ) : (
+            <span className={`text-xs px-2 py-1 rounded-full ${s.color}`}>{s.label}</span>
+          )}
+        </div>
       </div>
+
+      {hasPre && !isSplit && (
+        <p className="text-xs text-orange-700 bg-orange-50 border border-orange-100 rounded-lg px-3 py-2">
+          {hasNormal
+            ? '📦 ออเดอร์นี้มีสินค้าพรีออเดอร์ และคุณเลือกให้ส่งพร้อมกันรอบเดียว — จะจัดส่งเมื่อของพรีเข้าครบ'
+            : '📦 ออเดอร์พรีออเดอร์ — จะจัดส่งเมื่อของเข้า'}
+        </p>
+      )}
+      {isSplit && (
+        <p className="text-xs text-orange-700 bg-orange-50 border border-orange-100 rounded-lg px-3 py-2">
+          📦 ออเดอร์นี้แยกส่ง 2 รอบ — ของพร้อมส่งไปก่อน ของพรีออเดอร์ตามไปทีหลัง จึงคิดค่าส่ง 2 รอบ
+        </p>
+      )}
 
       {/* รายการสินค้า */}
       <div className="space-y-1 border-t pt-3">
         {order.order_items?.map((item: any) => (
           <div key={item.id} className="flex justify-between text-sm">
-            <span className="text-gray-600">{item.name} x{item.quantity}</span>
+            <span className="text-gray-600">
+              {item.name} x{item.quantity}
+              {item.is_preorder && (
+                <span className="ml-1 text-[10px] text-orange-600 bg-orange-50 border border-orange-200 rounded px-1 py-0.5">พรี</span>
+              )}
+            </span>
             <span className="text-gray-800">฿{item.price * item.quantity}</span>
           </div>
         ))}
         <div className="flex justify-between text-xs text-gray-400 pt-1">
-          <span>ค่าส่ง</span>
+          <span>ค่าส่ง{isSplit ? ' (2 รอบ)' : ''}</span>
           <span>฿{order.shipping_fee}</span>
         </div>
         <div className="flex justify-between font-bold text-blue-900 border-t pt-1">
@@ -85,8 +118,15 @@ export default function OrdersPage() {
       {/* เลขพัสดุ */}
       {order.tracking_number && (
         <div className="bg-blue-50 rounded-lg p-3">
-          <p className="text-xs text-gray-500 mb-1">เลขพัสดุ</p>
+          <p className="text-xs text-gray-500 mb-1">เลขพัสดุ{isSplit ? ' (รอบของพร้อมส่ง)' : ''}</p>
           <p className="font-bold text-blue-700 text-lg">{order.tracking_number}</p>
+          <p className="text-xs text-gray-400 mt-1">นำเลขนี้ไปเช็คที่เว็บขนส่งได้เลยครับ</p>
+        </div>
+      )}
+      {isSplit && order.preorder_tracking_number && (
+        <div className="bg-orange-50 rounded-lg p-3">
+          <p className="text-xs text-gray-500 mb-1">เลขพัสดุ (รอบพรีออเดอร์)</p>
+          <p className="font-bold text-orange-700 text-lg">{order.preorder_tracking_number}</p>
           <p className="text-xs text-gray-400 mt-1">นำเลขนี้ไปเช็คที่เว็บขนส่งได้เลยครับ</p>
         </div>
       )}

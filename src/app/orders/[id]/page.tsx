@@ -46,7 +46,12 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
   if (loading) return <div className="min-h-screen bg-blue-50 flex items-center justify-center">กำลังโหลด...</div>
   if (!order) return null
 
+  const hasPre = items.some((i: any) => i.is_preorder)
+  const hasNormal = items.some((i: any) => !i.is_preorder)
+  // แยกส่ง 2 รอบ = มีทั้งของพร้อมส่งและของพรี และไม่ได้เลือกให้ส่งพร้อมกัน
+  const isSplit = hasPre && hasNormal && !order.ship_together
   const s = statusLabel[order.status]
+  const ps = statusLabel[order.preorder_status ?? 'pending_payment']
 
   return (
     <main className="min-h-screen bg-blue-50">
@@ -58,15 +63,62 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
         </div>
 
         {/* สถานะ */}
-        <div className="bg-white rounded-xl shadow-sm p-4">
-          <span className={`text-sm px-3 py-1 rounded-full font-medium ${s.color}`}>{s.label}</span>
-          {order.tracking_number && (
-            <div className="mt-3 p-3 bg-blue-50 rounded-lg">
-              <p className="text-xs text-gray-500">เลขพัสดุ</p>
-              <p className="font-bold text-blue-900">{order.tracking_number}</p>
+        {isSplit ? (
+          <div className="space-y-3">
+            <p className="text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">
+              📦 ออเดอร์นี้แยกส่ง 2 รอบ — ของพร้อมส่งไปก่อน ของพรีออเดอร์ตามไปทีหลัง จึงคิดค่าส่ง 2 รอบ
+            </p>
+
+            <div className="bg-white rounded-xl shadow-sm p-4">
+              <p className="text-sm font-semibold text-gray-800 mb-2">รอบที่ 1 · ของพร้อมส่ง</p>
+              <span className={`text-sm px-3 py-1 rounded-full font-medium ${s.color}`}>{s.label}</span>
+              <div className="mt-2 space-y-1">
+                {items.filter((i: any) => !i.is_preorder).map((item: any) => (
+                  <p key={item.id} className="text-xs text-gray-500">{item.name} x{item.quantity}</p>
+                ))}
+              </div>
+              {order.tracking_number && (
+                <div className="mt-3 p-3 bg-blue-50 rounded-lg">
+                  <p className="text-xs text-gray-500">เลขพัสดุ</p>
+                  <p className="font-bold text-blue-900">{order.tracking_number}</p>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+
+            <div className="bg-white rounded-xl shadow-sm p-4 border-l-4 border-orange-400">
+              <p className="text-sm font-semibold text-gray-800 mb-2">รอบที่ 2 · สินค้าพรีออเดอร์</p>
+              <span className={`text-sm px-3 py-1 rounded-full font-medium ${ps.color}`}>{ps.label}</span>
+              <div className="mt-2 space-y-1">
+                {items.filter((i: any) => i.is_preorder).map((item: any) => (
+                  <p key={item.id} className="text-xs text-gray-500">{item.name} x{item.quantity}</p>
+                ))}
+              </div>
+              {order.preorder_tracking_number && (
+                <div className="mt-3 p-3 bg-orange-50 rounded-lg">
+                  <p className="text-xs text-gray-500">เลขพัสดุ</p>
+                  <p className="font-bold text-orange-700">{order.preorder_tracking_number}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="bg-white rounded-xl shadow-sm p-4">
+            <span className={`text-sm px-3 py-1 rounded-full font-medium ${s.color}`}>{s.label}</span>
+            {hasPre && (
+              <p className="mt-3 text-xs text-orange-700 bg-orange-50 border border-orange-100 rounded-lg px-3 py-2">
+                {hasNormal
+                  ? '📦 ออเดอร์นี้มีสินค้าพรีออเดอร์ และคุณเลือกให้ส่งพร้อมกันรอบเดียว — จะจัดส่งเมื่อของพรีเข้าครบ'
+                  : '📦 ออเดอร์พรีออเดอร์ — จะจัดส่งเมื่อของเข้า'}
+              </p>
+            )}
+            {order.tracking_number && (
+              <div className="mt-3 p-3 bg-blue-50 rounded-lg">
+                <p className="text-xs text-gray-500">เลขพัสดุ</p>
+                <p className="font-bold text-blue-900">{order.tracking_number}</p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ที่อยู่จัดส่ง */}
         {address && (
@@ -83,14 +135,19 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
           <div className="space-y-2">
             {items.map(item => (
               <div key={item.id} className="flex justify-between text-sm">
-                <span className="text-gray-600">{item.name} x{item.quantity}</span>
+                <span className="text-gray-600">
+                  {item.name} x{item.quantity}
+                  {item.is_preorder && (
+                    <span className="ml-1 text-[10px] text-orange-600 bg-orange-50 border border-orange-200 rounded px-1 py-0.5">พรีออเดอร์</span>
+                  )}
+                </span>
                 <span className="font-medium">฿{item.price * item.quantity}</span>
               </div>
             ))}
           </div>
           <div className="border-t mt-3 pt-3 space-y-1">
             <div className="flex justify-between text-sm text-gray-500">
-              <span>ค่าส่ง</span><span>฿{order.shipping_fee}</span>
+              <span>ค่าส่ง{isSplit ? ' (2 รอบ)' : ''}</span><span>฿{order.shipping_fee}</span>
             </div>
             <div className="flex justify-between font-bold text-blue-900">
               <span>รวม</span><span>฿{order.total}</span>
