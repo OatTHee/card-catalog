@@ -177,6 +177,10 @@ async function handleVariantDragEnd(event: DragEndEvent, productId: string) {
   className="text-sm bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
   จัดการ Order
 </a>
+<a href="/admin/preorders"
+  className="text-sm bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600">
+  จัดการ Pre-order
+</a>
 <a href="/admin/redeems"
   className="text-sm bg-amber-500 text-white px-4 py-2 rounded hover:bg-amber-600">
   จัดการการแลก
@@ -335,6 +339,7 @@ function SortableProductItem({ product, collapsed, onToggleCollapse, onEdit, onD
             <p className="text-xs text-gray-400 mt-1">
               {product.type === 'set' ? 'เซ็ต' : product.type === 'single' ? 'การ์ดแยกใบ' : 'อุปกรณ์เสริม'}
               {product.is_for_redeem && <span className="ml-2 text-amber-500">🎁 แลกด้วยแต้มได้</span>}
+              {product.is_preorder && <span className="ml-2 text-orange-500">📦 พรีออเดอร์</span>}
             </p>
           </div>
         </div>
@@ -406,6 +411,7 @@ function AddProductModal({ sellers, onClose, onSaved }: {
   const [saving, setSaving] = useState(false)
   const [isForSale, setIsForSale] = useState(true)
   const [isForRedeem, setIsForRedeem] = useState(false)
+  const [isPreorder, setIsPreorder] = useState(false)
 
   function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
   const file = e.target.files?.[0]
@@ -440,7 +446,7 @@ function AddProductModal({ sellers, onClose, onSaved }: {
 
   const { data: product, error } = await supabase
     .from('products')
-    .insert({ name, type, seller_id: sellerId, description, image_url: imageUrl, is_available: true, is_for_sale: isForSale, is_for_redeem: isForRedeem })
+    .insert({ name, type, seller_id: sellerId, description, image_url: imageUrl, is_available: true, is_for_sale: isForSale, is_for_redeem: isForRedeem, is_preorder: isPreorder })
     .select()
     .single()
 
@@ -531,7 +537,7 @@ if (validVariants.length > 0) {
             />
           </div>
 
-          <div className="flex gap-4 border rounded-lg p-3 bg-gray-50">
+          <div className="flex flex-wrap gap-4 border rounded-lg p-3 bg-gray-50">
             <label className="flex items-center gap-2 text-sm text-gray-700">
               <input type="checkbox" checked={isForSale} onChange={e => setIsForSale(e.target.checked)} />
               ขายในร้านค้า (/catalog)
@@ -540,7 +546,17 @@ if (validVariants.length > 0) {
               <input type="checkbox" checked={isForRedeem} onChange={e => setIsForRedeem(e.target.checked)} />
               เปิดให้แลกด้วยแต้ม (/redeem)
             </label>
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input type="checkbox" checked={isPreorder} onChange={e => setIsPreorder(e.target.checked)} />
+              📦 สินค้าพรีออเดอร์
+            </label>
           </div>
+          {isPreorder && (
+            <p className="text-xs text-orange-600 bg-orange-50 border border-orange-100 rounded-lg px-3 py-2">
+              สินค้าพรีออเดอร์จะถูกส่งคนละรอบกับสินค้าในสต็อก ออเดอร์จะไปโผล่ที่หน้า &ldquo;จัดการ Pre-order&rdquo;
+              และถ้าลูกค้าสั่งปนกับสินค้าในสต็อกจะคิดค่าส่ง 2 เท่า เว้นแต่ลูกค้าติ๊กให้ส่งพร้อมกัน
+            </p>
+          )}
 <div>
   <label className="text-sm text-gray-600">รูปสินค้า</label>
   <input
@@ -660,6 +676,7 @@ const [imagePreview, setImagePreview] = useState<string>(product.image_url ?? ''
   const [saving, setSaving] = useState(false)
   const [isForSale, setIsForSale] = useState(product.is_for_sale ?? true)
   const [isForRedeem, setIsForRedeem] = useState(product.is_for_redeem ?? false)
+  const [isPreorder, setIsPreorder] = useState(product.is_preorder ?? false)
   const [gachaConfigVariant, setGachaConfigVariant] = useState<any>(null)
 function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
   const file = e.target.files?.[0]
@@ -700,7 +717,7 @@ function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
 
   await supabase
     .from('products')
-    .update({ name, type, seller_id: sellerId, description, image_url: imageUrl, is_for_sale: isForSale, is_for_redeem: isForRedeem })
+    .update({ name, type, seller_id: sellerId, description, image_url: imageUrl, is_for_sale: isForSale, is_for_redeem: isForRedeem, is_preorder: isPreorder })
     .eq('id', product.id)
 
   for (const v of variants) {
@@ -785,7 +802,7 @@ function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
             />
           </div>
 
-          <div className="flex gap-4 border rounded-lg p-3 bg-gray-50">
+          <div className="flex flex-wrap gap-4 border rounded-lg p-3 bg-gray-50">
             <label className="flex items-center gap-2 text-sm text-gray-700">
               <input type="checkbox" checked={isForSale} onChange={e => setIsForSale(e.target.checked)} />
               ขายในร้านค้า (/catalog)
@@ -794,7 +811,17 @@ function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
               <input type="checkbox" checked={isForRedeem} onChange={e => setIsForRedeem(e.target.checked)} />
               เปิดให้แลกด้วยแต้ม (/redeem)
             </label>
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input type="checkbox" checked={isPreorder} onChange={e => setIsPreorder(e.target.checked)} />
+              📦 สินค้าพรีออเดอร์
+            </label>
           </div>
+          {isPreorder && (
+            <p className="text-xs text-orange-600 bg-orange-50 border border-orange-100 rounded-lg px-3 py-2">
+              สินค้าพรีออเดอร์จะถูกส่งคนละรอบกับสินค้าในสต็อก ออเดอร์จะไปโผล่ที่หน้า &ldquo;จัดการ Pre-order&rdquo;
+              และถ้าลูกค้าสั่งปนกับสินค้าในสต็อกจะคิดค่าส่ง 2 เท่า เว้นแต่ลูกค้าติ๊กให้ส่งพร้อมกัน
+            </p>
+          )}
 <div>
   <label className="text-sm text-gray-600">รูปสินค้า</label>
   <input

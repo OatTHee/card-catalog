@@ -38,6 +38,9 @@ export default function ProductCard({ product }: { product: any }) {
         <div className="p-3">
           <p className="text-xs text-blue-400 mb-0.5">
             {product.type === 'set' ? 'เซ็ต' : product.type === 'single' ? 'การ์ดแยกใบ' : 'อุปกรณ์เสริม'}
+            {product.is_preorder && (
+              <span className="ml-1 text-orange-600 bg-orange-50 border border-orange-200 rounded px-1">พรีออเดอร์</span>
+            )}
           </p>
           <h3 className="font-semibold text-sm text-gray-800 leading-tight mb-1">{product.name}</h3>
           <div className="flex items-center justify-between mt-2">
@@ -122,6 +125,12 @@ function ProductModal({ product, isOfficial, variants, onClose }: {
       {' · '}{product.sellers?.name}
     </p>
     <h2 className="font-bold text-gray-800 text-lg leading-tight">{product.name}</h2>
+    {product.is_preorder && (
+      <p className="text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded-lg px-2 py-1.5 mt-2">
+        📦 สินค้าพรีออเดอร์ — ส่งคนละรอบกับสินค้าพร้อมส่ง ถ้าสั่งปนกันจะคิดค่าส่ง 2 รอบ
+        เลือกให้ส่งพร้อมกันได้ตอนหน้าชำระเงิน
+      </p>
+    )}
 
     {product.description && (
       <p className="text-sm text-gray-500 mt-1">{product.description}</p>
