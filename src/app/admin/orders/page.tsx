@@ -20,6 +20,7 @@ export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedOrder, setSelectedOrder] = useState<any>(null)
+  const [filter, setFilter] = useState<'active' | 'all'>('active')
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -67,6 +68,11 @@ export default function AdminOrdersPage() {
     setSelectedOrder(null)
   }
 
+  // ค้างอยู่ = ยังไม่ได้ส่งถึงมือลูกค้า และไม่ได้ถูกยกเลิก
+  const isActive = (o: any) => o.status !== 'delivered' && o.status !== 'cancelled'
+  const activeCount = orders.filter(isActive).length
+  const visibleOrders = filter === 'active' ? orders.filter(isActive) : orders
+
   if (loading) return <div className="min-h-screen bg-gray-50 flex items-center justify-center">กำลังโหลด...</div>
 
   return (
@@ -81,16 +87,32 @@ export default function AdminOrdersPage() {
             <a href="/admin/managebag" className="text-teal-600 text-sm">จัดการกระเป๋า</a>
             <h1 className="font-bold text-gray-800">จัดการ Order</h1>
           </div>
+          <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => setFilter('active')}
+              className={`text-xs px-3 py-1 rounded-md ${filter === 'active' ? 'bg-white shadow-sm text-gray-800 font-medium' : 'text-gray-500'}`}
+            >
+              ค้างอยู่ <span className="text-gray-400">{activeCount}</span>
+            </button>
+            <button
+              onClick={() => setFilter('all')}
+              className={`text-xs px-3 py-1 rounded-md ${filter === 'all' ? 'bg-white shadow-sm text-gray-800 font-medium' : 'text-gray-500'}`}
+            >
+              ทั้งหมด <span className="text-gray-400">{orders.length}</span>
+            </button>
+          </div>
         </div>
       </header>
 
       <div className="max-w-5xl mx-auto px-4 py-6">
         <div className="space-y-3">
-          {orders.length === 0 && (
-            <div className="bg-white rounded-xl p-8 text-center text-gray-400">ยังไม่มีคำสั่งซื้อ</div>
+          {visibleOrders.length === 0 && (
+            <div className="bg-white rounded-xl p-8 text-center text-gray-400">
+              {filter === 'active' ? 'ไม่มีออเดอร์ค้างอยู่ 🎉' : 'ยังไม่มีคำสั่งซื้อ'}
+            </div>
           )}
-          {orders.map(order => {
-            const s = statusLabel[order.status]
+          {visibleOrders.map(order => {
+            const s = statusLabel[order.status] ?? { label: order.status, color: 'bg-gray-100 text-gray-600' }
             return (
               <div key={order.id} className="bg-white rounded-xl shadow-sm p-4">
                 <div className="flex justify-between items-start">
