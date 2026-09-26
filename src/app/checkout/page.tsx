@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { getCart, clearCart, CartItem } from '@/lib/cart'
 import Header from '@/components/Header'
+import { SHOP_CLOSED } from '@/lib/shopStatus'
 import Footer from '@/components/Footer'
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -79,7 +80,7 @@ export default function CheckoutPage() {
   }
 
   async function handleSubmit() {
-    if (!selectedAddress || !slipFile || cart.length === 0) return
+    if (SHOP_CLOSED || !selectedAddress || !slipFile || cart.length === 0) return
     setSubmitting(true)
 
     for (const item of cart) {
@@ -264,10 +265,10 @@ export default function CheckoutPage() {
 
         <button
           onClick={handleSubmit}
-          disabled={submitting || !selectedAddress || !slipFile || cart.length === 0}
+          disabled={SHOP_CLOSED || submitting || !selectedAddress || !slipFile || cart.length === 0}
           className="w-full bg-blue-500 text-white py-3 rounded-xl font-medium hover:bg-blue-600 disabled:opacity-50"
         >
-          {submitting ? 'กำลังดำเนินการ...' : 'ยืนยันคำสั่งซื้อ'}
+          {SHOP_CLOSED ? 'ปิดการขายชั่วคราว' : submitting ? 'กำลังดำเนินการ...' : 'ยืนยันคำสั่งซื้อ'}
         </button>
       </div>
 

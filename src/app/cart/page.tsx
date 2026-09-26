@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { getCart, removeFromCart, updateQuantity, CartItem } from '@/lib/cart'
 import { createClient } from '@supabase/supabase-js'
 import Header from '@/components/Header'
+import { SHOP_CLOSED } from '@/lib/shopStatus'
 import Footer from '@/components/Footer'
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -100,7 +101,12 @@ export default function CartPage() {
               </div>
             </div>
 
-            {session ? (
+            {SHOP_CLOSED ? (
+              <button disabled
+                className="block w-full bg-gray-200 text-gray-500 text-center py-3 rounded-xl font-medium cursor-not-allowed">
+                ปิดการขายชั่วคราว
+              </button>
+            ) : session ? (
               <a href="/checkout"
                 className="block w-full bg-blue-500 text-white text-center py-3 rounded-xl font-medium hover:bg-blue-600">
                 สั่งซื้อ

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { getCartCount } from '@/lib/cart'
+import ShopClosedNotice from '@/components/ShopClosedNotice'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -47,6 +48,7 @@ return () => {
   }
 
   return (
+    <>
     <header className="bg-white border-b border-blue-100 shadow-sm">
       <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
         <a href="/catalog" className="flex items-center gap-3">
@@ -90,5 +92,7 @@ return () => {
         </div>
       </div>
     </header>
+    <ShopClosedNotice />
+    </>
   )
 }

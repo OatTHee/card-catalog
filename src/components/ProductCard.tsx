@@ -1,6 +1,7 @@
 'use client'
 
 import { addToCart } from '@/lib/cart'
+import { SHOP_CLOSED } from '@/lib/shopStatus'
 import { useState } from 'react'
 import Image from 'next/image'
 
@@ -180,6 +181,10 @@ function ProductModal({ product, isOfficial, variants, onClose }: {
         >
           ติดต่อซื้อ
         </a>
+      ) : SHOP_CLOSED ? (
+        <button disabled className="w-full py-3 rounded-xl bg-gray-100 text-gray-400 cursor-not-allowed">
+          ปิดการขายชั่วคราว
+        </button>
       ) : !isAvailable ? (
         <button disabled className="w-full py-3 rounded-xl bg-gray-100 text-gray-400 cursor-not-allowed">
           หมดแล้ว
