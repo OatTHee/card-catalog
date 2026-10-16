@@ -16,7 +16,7 @@ Project ref `joceifkrecfcntbjpsvn` · Postgres 17 · schema `public` · RLS เ�
 | `products` | 47 | สินค้า `type` ∈ `set \| single \| accessory \| gacha` · `is_available` (แสดง/ซ่อน), `is_for_sale` (โชว์ `/catalog`), `is_for_redeem` (โชว์ `/redeem`), `is_preorder`, `sort_order`, `seller_id`, `deleted_at` (soft delete) |
 | `product_variants` | 236 | ตัวเลือกย่อย `price`, `stock`, `image_url`, `sort_order`, `redeem_points` (null = แลกแต้มไม่ได้), `deleted_at` (soft delete) |
 | `set_items` | 0 | รายการการ์ดในเซ็ต — ว่าง, RLS ไม่มี policy (ใช้งานไม่ได้จาก client) แต่ `/admin` ลบแถวในนี้ตอนลบสินค้า |
-| `settings` | 2 | key/value text — `shipping_fee = 40`, `preorder_mode` (`on`\|`off` สวิตช์ช่วงพรีออเดอร์ในหน้า /admin) · (`redeem_free_shipping_threshold` ถูกอ่านแต่ **ยังไม่มีแถว** → default 40) · **ไม่มี INSERT policy** — key ใหม่ต้อง insert ด้วย SQL |
+| `settings` | 3 | key/value text — `shipping_fee = 40`, `preorder_mode` (`on`\|`off` สวิตช์ช่วงพรีออเดอร์ในหน้า /admin), `announcement` (JSON ประกาศหน้าร้าน `{enabled,title,body,link_text,link_url,image_url,tone}` ดู `src/lib/announcement.ts`) · (`redeem_free_shipping_threshold` ถูกอ่านแต่ **ยังไม่มีแถว** → default 40) · **ไม่มี INSERT policy** — key ใหม่ต้อง insert ด้วย SQL |
 | `user_profiles` | 2 | role `admin \| vendor` (+ `seller_id` ของ vendor) — ตอนนี้ admin 2 คน vendor 0 · `id` = `auth.users.id` |
 | `customers` | 146 | 1 แถวต่อผู้ใช้ที่ login (`id` = `auth.users.id`) · `points`, `exp`, `uid` (unique, จากระบบเก่า), `discord_id` (unique), `real_name`, `address_raw` (ที่อยู่แบบเก่า) |
 | `shipping_addresses` | 85 | ที่อยู่หลายที่ต่อคน `is_default` |

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { revalidateCatalog } from '@/app/actions/revalidate'
 import { PREORDER_MODE_KEY, isPreorderModeOn } from '@/lib/preorder'
+import AnnouncementEditor from '@/components/AnnouncementEditor'
 import {
   DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent
 } from '@dnd-kit/core'
@@ -450,6 +451,8 @@ export default function AdminPage() {
             </div>
           </div>
         )}
+
+        {mode === 'manage' && <AnnouncementEditor />}
       </div>
 
       {detail && (

@@ -52,6 +52,7 @@ npx next build         # ต้องมี env ครบ (ดูด้านล
 - ตาราง `wallet_transactions` / `stock_transactions` เป็น ledger แบบ append-only (มี trigger เขียนให้อัตโนมัติ) ห้าม UPDATE/DELETE แถวเก่า
 - แอดมินแก้สินค้าแล้วต้องเรียก `revalidateCatalog()` (`src/app/actions/revalidate.ts`) ไม่งั้น `/catalog` ค้าง cache 1 ชม.
 - สวิตช์ปิดร้านชั่วคราว: `src/lib/shopStatus.ts` (`SHOP_CLOSED`) ข้อความประกาศอยู่ `src/components/ShopClosedNotice.tsx`
+- ประกาศทั่วไป (ไม่ปิดร้าน, เฉพาะ `/catalog`): แอดมินแก้ในหน้า `/admin` เก็บที่ `settings.announcement` — `src/components/AnnouncementBar.tsx` / `AnnouncementEditor.tsx`
 - สถานะออเดอร์ (`orders.status`) เป็นภาษาอังกฤษ: `pending_payment | paid | shipping | delivered | cancelled` แต่สถานะการแลก (`redeem_history.status`) เป็น**ภาษาไทย**: `กำลังตรวจสอบสลิป | กำลังเตรียมของ | ส่งแล้ว | สลิปไม่ถูกต้อง` และ `bag.status` = `In Bag | Shipped` — มี CHECK constraint ห้ามสะกดต่าง
 - ไฟล์ `r2-migration.patch` และ `revalidate-catalog.patch` ที่ root **ถูก apply ไปแล้ว** (โค้ดปัจจุบันใหม่กว่า patch) ห้าม `git apply` ซ้ำ
 - `scripts/migrate-to-r2.mjs` เขียน DB จริงเมื่อรันด้วย `--apply` — ห้ามรันถ้าไม่ได้สั่ง (ตรวจแล้ว: ไม่มี URL รูปที่ชี้ไป supabase.co เหลือใน DB แล้ว)

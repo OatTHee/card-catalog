@@ -5,6 +5,8 @@ import { createClient } from '@supabase/supabase-js'
 import Footer from '@/components/Footer'
 import ProductCard from '@/components/ProductCard'
 import { PREORDER_MODE_KEY, isPreorderModeOn } from '@/lib/preorder'
+import AnnouncementBar from '@/components/AnnouncementBar'
+import { ANNOUNCEMENT_KEY, parseAnnouncement } from '@/lib/announcement'
 
 // PostgREST สะดุดเป็นครั้งคราว (504 Gateway Timeout) ทั้งที่ข้อมูลเล็กมาก
 // เคยทำให้ sellers พังจนแคตตาล็อกว่างทั้งหน้า และเคยทำให้ build บน Vercel ล้ม
@@ -49,7 +51,7 @@ async function getProducts() {
         .is('deleted_at', null)
         .order('sort_order', { ascending: true })
     ),
-    withRetry(() => supabase.from('settings').select('key, value').in('key', [PREORDER_MODE_KEY])),
+    withRetry(() => supabase.from('settings').select('key, value').in('key', [PREORDER_MODE_KEY, ANNOUNCEMENT_KEY])),
   ])
 
   // สำคัญ: ถ้า query ไหนพัง ต้อง throw ไม่ใช่ปล่อยให้ render เป็นหน้าว่าง
@@ -78,11 +80,12 @@ async function getProducts() {
       product_variants: variants.filter(v => v.product_id === product.id)
     })),
     preorderMode: isPreorderModeOn(settings.get(PREORDER_MODE_KEY)),
+    announcement: parseAnnouncement(settings.get(ANNOUNCEMENT_KEY)),
   }
 }
 
 export default async function CatalogPage() {
-  const { products, preorderMode } = await getProducts()
+  const { products, preorderMode, announcement } = await getProducts()
 
   const available = products.filter(p => p.is_available)
   const official = available.filter(p => p.sellers?.type === 'official')
@@ -95,6 +98,7 @@ export default async function CatalogPage() {
   return (
     <main className="min-h-screen bg-blue-50">
 <Header />
+      <AnnouncementBar announcement={announcement} />
       <div className="max-w-5xl mx-auto px-4 py-8">
         <Section title="สินค้ากลุ่ม" subtitle="ผลิตภัณฑ์ของทางกลุุ่ม และร้าน มาสเตอร์ ดี ไฟท์เตอร์" products={[...official, ...orphan]} color="blue" preorderMode={preorderMode} />
         <Section title="สินค้าแอดมิน" subtitle="ของแอดมิน" products={admin} color="sky" preorderMode={preorderMode} />
