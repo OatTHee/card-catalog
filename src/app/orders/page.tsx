@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
+import { sortOrderItems } from '@/lib/orderItems'
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
@@ -94,7 +95,7 @@ export default function OrdersPage() {
 
       {/* รายการสินค้า */}
       <div className="space-y-1 border-t pt-3">
-        {order.order_items?.map((item: any) => (
+        {sortOrderItems(its).map((item: any) => (
           <div key={item.id} className="flex justify-between text-sm">
             <span className="text-gray-600">
               {item.name} x{item.quantity}

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { getCart, removeFromCart, updateQuantity, CartItem } from '@/lib/cart'
+import { getCart, removeFromCart, updateQuantity, isPromoLine, CartItem } from '@/lib/cart'
 import { createClient } from '@supabase/supabase-js'
 import Header from '@/components/Header'
 import { SHOP_CLOSED } from '@/lib/shopStatus'
@@ -30,7 +30,7 @@ export default function CartPage() {
     const currentCart = getCart()
     const [{ data }, { info }] = await Promise.all([
       supabase.from('settings').select('value').eq('key', 'shipping_fee').single(),
-      loadVariantStockInfo(supabase, currentCart.map(i => i.variantId))
+      loadVariantStockInfo(supabase, currentCart.filter(i => !isPromoLine(i)).map(i => i.variantId))
     ])
     if (data) setShippingFee(Number(data.value))
     setStockInfo(info)
@@ -88,6 +88,9 @@ export default function CartPage() {
                   </div>
                   <div className="flex flex-col items-end gap-2">
                     <button onClick={() => handleRemove(item.variantId)} className="text-xs text-red-400 hover:text-red-600">ลบ</button>
+                    {isPromoLine(item) ? (
+                      <span className="text-xs text-gray-400">1 ชุด</span>
+                    ) : (
                     <div className="flex items-center gap-2">
                       <button onClick={() => handleQuantity(item.variantId, item.quantity - 1)}
                         className="w-6 h-6 rounded border text-sm flex items-center justify-center hover:bg-gray-50">-</button>
@@ -95,6 +98,7 @@ export default function CartPage() {
                       <button onClick={() => handleQuantity(item.variantId, item.quantity + 1)}
                         className="w-6 h-6 rounded border text-sm flex items-center justify-center hover:bg-gray-50">+</button>
                     </div>
+                    )}
                   </div>
                 </div>
               ))}

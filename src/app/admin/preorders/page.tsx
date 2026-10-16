@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
+import { sortOrderItems } from '@/lib/orderItems'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -53,7 +54,7 @@ export default function AdminPreordersPage() {
     const withItems = await Promise.all((ordersData ?? []).map(async order => {
       const { data: items } = await supabase.from('order_items').select('*').eq('order_id', order.id)
       const { data: addr } = await supabase.from('shipping_addresses').select('*').eq('id', order.shipping_address_id).single()
-      const all = items ?? []
+      const all = sortOrderItems(items ?? [])
       const hasPre = all.some((i: any) => i.is_preorder)
       const hasNormal = all.some((i: any) => !i.is_preorder)
       const isSplit = hasPre && hasNormal && !order.ship_together

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
-import { getCart, clearCart, CartItem } from '@/lib/cart'
+import { getCart, clearCart, isPromoLine, CartItem } from '@/lib/cart'
 import Header from '@/components/Header'
 import { SHOP_CLOSED } from '@/lib/shopStatus'
 import { loadVariantStockInfo, splitLine, splitWarning, VariantStockInfo } from '@/lib/preorder'
@@ -52,7 +52,7 @@ export default function CheckoutPage() {
 
   async function loadData(userId: string) {
     const currentCart = getCart()
-    const variantIds = currentCart.map(i => i.variantId)
+    const variantIds = currentCart.filter(i => !isPromoLine(i)).map(i => i.variantId)
 
     const [{ data: addrs }, { data: settings }, { info }] = await Promise.all([
       supabase.from('shipping_addresses').select('*').eq('customer_id', userId).order('is_default', { ascending: false }),
@@ -79,6 +79,19 @@ export default function CheckoutPage() {
     setSubmitting(true)
 
     for (const item of cart) {
+      if (isPromoLine(item)) {
+        // โปร: ทุกชิ้นในโปรต้องมีของ (โปรไม่ใช้ช่วงพรีออเดอร์) — DB เช็คซ้ำอีกรอบ
+        const need = new Map<string, number>()
+        for (const id of item.promoVariantIds ?? []) need.set(id, (need.get(id) ?? 0) + 1)
+        const { data: rows } = await supabase.from('product_variants').select('id, stock').in('id', [...need.keys()])
+        const short = [...need].some(([id, n]) => ((rows ?? []).find(r => r.id === id)?.stock ?? 0) < n)
+        if (!rows || rows.length !== need.size || short) {
+          alert(`${item.productName} ของหมดแล้วครับ กรุณาลบออกจากตะกร้า`)
+          setSubmitting(false)
+          return
+        }
+        continue
+      }
       const { data: variant } = await supabase
         .from('product_variants').select('stock, name').eq('id', item.variantId).single()
       // ช่วงพรีออเดอร์: ร้าน official สั่งเกินสต็อกได้ (ส่วนเกินเป็นพรี) — DB เช็คซ้ำอีกรอบ
@@ -108,11 +121,14 @@ export default function CheckoutPage() {
     // (RPC เป็น SECURITY DEFINER จึงข้าม RLS ของ product_variants ได้ และล็อกแถวกัน oversell)
     const { data: result, error: rpcError } = await supabase.rpc('place_order', {
       p_shipping_address_id: selectedAddress,
-      p_items: cart.map(i => ({
-        variant_id: i.variantId,
-        quantity: i.quantity,
-        name: `${i.productName} - ${i.variantName}`
-      })),
+      p_items: cart.map(i => isPromoLine(i)
+        // โปร: ส่งแค่ id โปร + ชิ้นที่เลือก ราคา/ชื่อ/ของแถม DB คำนวณเอง
+        ? { promotion_id: i.promotionId, variant_ids: i.promoVariantIds ?? [] }
+        : {
+          variant_id: i.variantId,
+          quantity: i.quantity,
+          name: `${i.productName} - ${i.variantName}`
+        }),
       p_slip_url: slipUrl,
       p_ship_together: shipTogether
     })

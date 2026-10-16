@@ -7,6 +7,8 @@ import ProductCard from '@/components/ProductCard'
 import { PREORDER_MODE_KEY, isPreorderModeOn } from '@/lib/preorder'
 import AnnouncementBar from '@/components/AnnouncementBar'
 import { ANNOUNCEMENT_KEY, parseAnnouncement } from '@/lib/announcement'
+import PromotionCard from '@/components/PromotionCard'
+import { PromotionView, PromoItemView, isPromotionAvailable } from '@/lib/promotion'
 
 // PostgREST สะดุดเป็นครั้งคราว (504 Gateway Timeout) ทั้งที่ข้อมูลเล็กมาก
 // เคยทำให้ sellers พังจนแคตตาล็อกว่างทั้งหน้า และเคยทำให้ build บน Vercel ล้ม
@@ -34,7 +36,7 @@ async function getProducts() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
   )
 
-  const [sellersRes, productsRes, variantsRes, settingsRes] = await Promise.all([
+  const [sellersRes, productsRes, variantsRes, settingsRes, promotionsRes] = await Promise.all([
     withRetry(() => supabase.from('sellers').select('id, type')),
     withRetry(() =>
       supabase
@@ -52,6 +54,13 @@ async function getProducts() {
         .order('sort_order', { ascending: true })
     ),
     withRetry(() => supabase.from('settings').select('key, value').in('key', [PREORDER_MODE_KEY, ANNOUNCEMENT_KEY])),
+    withRetry(() =>
+      supabase
+        .from('promotions')
+        .select('id, name, type, price, description, image_url, promotion_items(variant_id, quantity)')
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true })
+    ),
   ])
 
   // สำคัญ: ถ้า query ไหนพัง ต้อง throw ไม่ใช่ปล่อยให้ render เป็นหน้าว่าง
@@ -62,6 +71,7 @@ async function getProducts() {
     productsRes.error && `products: ${(productsRes.error as any)?.message ?? productsRes.error}`,
     variantsRes.error && `product_variants: ${(variantsRes.error as any)?.message ?? variantsRes.error}`,
     settingsRes.error && `settings: ${(settingsRes.error as { message?: string })?.message ?? settingsRes.error}`,
+    promotionsRes.error && `promotions: ${(promotionsRes.error as { message?: string })?.message ?? promotionsRes.error}`,
   ].filter(Boolean)
 
   if (failed.length > 0) {
@@ -73,6 +83,41 @@ async function getProducts() {
   const variants = variantsRes.data ?? []
   const settings = new Map((settingsRes.data ?? []).map(s => [s.key, s.value]))
 
+  // โปรโมชัน: ใช้ได้เฉพาะสินค้าร้าน official ที่ขายอยู่ (แสดง + ยังไม่ถูกลบ)
+  // ถ้าของชิ้นไหนในโปรไม่อยู่ในร้านแล้ว หรือสต็อกไม่พอ -> ไม่แสดงโปรนั้น
+  const shopProducts = new Map(products
+    .filter(p => p.is_available && sellers.find(s => s.id === p.seller_id)?.type === 'official')
+    .map(p => [p.id, p]))
+  const variantById = new Map(variants.map(v => [v.id, v]))
+  const promotions: PromotionView[] = []
+  for (const promo of promotionsRes.data ?? []) {
+    const items: PromoItemView[] = []
+    let broken = false
+    for (const pi of (promo.promotion_items ?? []) as { variant_id: string, quantity: number }[]) {
+      const v = variantById.get(pi.variant_id)
+      const p = v ? shopProducts.get(v.product_id) : undefined
+      if (!v || !p) { broken = true; break }
+      items.push({
+        variantId: v.id,
+        name: `${p.name} - ${v.name}`,
+        price: Number(v.price),
+        stock: v.stock ?? 0,
+        quantity: pi.quantity,
+        imageUrl: v.image_url || p.image_url,
+      })
+    }
+    const view: PromotionView = {
+      id: promo.id,
+      name: promo.name,
+      type: promo.type,
+      price: promo.price == null ? null : Number(promo.price),
+      description: promo.description,
+      imageUrl: promo.image_url,
+      items,
+    }
+    if (!broken && isPromotionAvailable(view)) promotions.push(view)
+  }
+
   return {
     products: products.map(product => ({
       ...product,
@@ -81,11 +126,12 @@ async function getProducts() {
     })),
     preorderMode: isPreorderModeOn(settings.get(PREORDER_MODE_KEY)),
     announcement: parseAnnouncement(settings.get(ANNOUNCEMENT_KEY)),
+    promotions,
   }
 }
 
 export default async function CatalogPage() {
-  const { products, preorderMode, announcement } = await getProducts()
+  const { products, preorderMode, announcement, promotions } = await getProducts()
 
   const available = products.filter(p => p.is_available)
   const official = available.filter(p => p.sellers?.type === 'official')
@@ -100,6 +146,22 @@ export default async function CatalogPage() {
 <Header />
       <AnnouncementBar announcement={announcement} />
       <div className="max-w-5xl mx-auto px-4 py-8">
+        {promotions.length > 0 && (
+          <section className="mb-10">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-1 h-6 rounded-full bg-pink-500" />
+              <div>
+                <h2 className="text-base font-bold text-gray-800">โปรโมชัน</h2>
+                <p className="text-xs text-gray-400">เหมาราคาเดียว / ซื้อ 1 แถม 1</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {promotions.map(promo => (
+                <PromotionCard key={promo.id} promotion={promo} />
+              ))}
+            </div>
+          </section>
+        )}
         <Section title="สินค้ากลุ่ม" subtitle="ผลิตภัณฑ์ของทางกลุุ่ม และร้าน มาสเตอร์ ดี ไฟท์เตอร์" products={[...official, ...orphan]} color="blue" preorderMode={preorderMode} />
         <Section title="สินค้าแอดมิน" subtitle="ของแอดมิน" products={admin} color="sky" preorderMode={preorderMode} />
         <Section title="สินค้ามือสอง" subtitle="ร้านค้าอื่นๆ" products={vendor} color="slate" preorderMode={preorderMode} />

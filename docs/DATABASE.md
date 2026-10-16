@@ -21,7 +21,9 @@ Project ref `joceifkrecfcntbjpsvn` · Postgres 17 · schema `public` · RLS เ�
 | `customers` | 146 | 1 แถวต่อผู้ใช้ที่ login (`id` = `auth.users.id`) · `points`, `exp`, `uid` (unique, จากระบบเก่า), `discord_id` (unique), `real_name`, `address_raw` (ที่อยู่แบบเก่า) |
 | `shipping_addresses` | 85 | ที่อยู่หลายที่ต่อคน `is_default` |
 | `orders` | 94 | `status` (CHECK `pending_payment\|paid\|shipping\|delivered\|cancelled`), `subtotal`, `shipping_fee`, `total`, `slip_url`, `tracking_number`, `stock_deducted`, `ship_together`, `preorder_status` (null ถ้าไม่แยกส่ง), `preorder_tracking_number`, `preorder_stock_deducted` |
-| `order_items` | 260 | `variant_id`, `name`, `price` (snapshot), `quantity`, `is_preorder` (snapshot), `is_backorder` (สั่งตอนของหมดในช่วงพรีออเดอร์ = **ไม่ได้ตัดสต็อก**, `_apply_stock_delta` ข้ามบรรทัดนี้) |
+| `order_items` | 260 | `variant_id`, `name`, `price` (snapshot), `quantity`, `is_preorder` (snapshot), `is_backorder` (สั่งตอนของหมดในช่วงพรีออเดอร์ = **ไม่ได้ตัดสต็อก**, `_apply_stock_delta` ข้ามบรรทัดนี้), `promotion_id` / `promotion_name` (snapshot) / `promo_group` (จับกลุ่มโปร 1 ชุด) — แถวหัวโปรมี `variant_id = null` |
+| `promotions` | 0 | โปรหน้าร้าน `type` ∈ `bundle` (เหมา: `price` = ราคาเหมา) \| `b1g1` (ซื้อ 1 แถม 1: เลือก 2 ชิ้นคละ ชิ้นถูกฟรี) · `is_active` เปิด/ปิดเอง · RLS อ่านทุกคน เขียนเฉพาะ `is_admin()` |
+| `promotion_items` | 0 | สินค้าในโปร `promotion_id` (cascade), `variant_id`, `quantity` (ใช้กับเหมา) |
 | `stock_transactions` | 808 | ledger สต็อก (trigger `log_stock_change` เขียนเมื่อ `product_variants.stock` เปลี่ยน แล้ว RPC แก้ `reason` ทีหลัง) |
 | `legacy_accounts` | 59 | ผู้เล่นจากระบบเก่า PK `uid` · `discord_id`, `points`, `exp`, `duels`, `champion`, `top3`, `top5`, `last_active`, `claimed_by`, `claimed_at` |
 | `player_stats` | 38 | สถิติแข่งของคนที่ claim แล้ว PK `user_id` |
@@ -46,7 +48,7 @@ Foreign key ที่มีผลตอนลบ (ตรวจซ้ำ 16 ต.�
 
 | RPC | เรียกจาก | เช็คสิทธิ์ | ทำอะไร |
 |---|---|---|---|
-| `place_order(p_shipping_address_id, p_items, p_slip_url, p_ship_together)` | `/checkout` | `auth.uid()` + ที่อยู่ต้องเป็นของตัวเอง | ล็อก variant (`FOR UPDATE`) เช็คสต็อก, ราคา/ค่าส่งจาก DB, สร้าง order + items, ตัดสต็อก, คืน `{order_id, total, has_preorder, is_split, has_backorder, …}` · ปฏิเสธของที่ `deleted_at` · ถ้า `preorder_mode = on` + ร้าน official + สต็อกไม่พอ → แยกบรรทัด: ส่วนที่มีของ (ตัดสต็อก) + ส่วนเกิน (`is_preorder = is_backorder = true` ไม่ตัดสต็อก) |
+| `place_order(p_shipping_address_id, p_items, p_slip_url, p_ship_together)` | `/checkout` | `auth.uid()` + ที่อยู่ต้องเป็นของตัวเอง | ล็อก variant (`FOR UPDATE`) เช็คสต็อก, ราคา/ค่าส่งจาก DB, สร้าง order + items, ตัดสต็อก, คืน `{order_id, total, has_preorder, is_split, has_backorder, …}` · ปฏิเสธของที่ `deleted_at` · ถ้า `preorder_mode = on` + ร้าน official + สต็อกไม่พอ → แยกบรรทัด: ส่วนที่มีของ (ตัดสต็อก) + ส่วนเกิน (`is_preorder = is_backorder = true` ไม่ตัดสต็อก) · รับรายการโปร `{promotion_id, variant_ids}` (1 โปรต่อออเดอร์, ไม่ใช้ช่วงพรี, ราคาคิดฝั่ง DB ผ่าน `_promo_lines`) · นับสต็อกสะสมต่อ variant ในออเดอร์เดียว (บรรทัดซ้ำ/โปร+ชิ้นเดี่ยว ขายเกินไม่ได้) |
 | `redeem_to_bag(p_items)` | `RedeemCard` | `auth.uid()` | เช็คสต็อก/แต้ม ตัดสต็อก หักแต้ม ใส่ bag — **⚠️ ใช้ `points` ที่ client ส่งมา ดู KNOWN_ISSUES #S2** |
 | `open_gacha_pack(p_bag_id)` | `/redeem` | เจ้าของ bag หรือ admin | สุ่มรางวัลผ่าน `_resolve_gacha_pack` ต่อชื่อผลไว้ท้าย `bag.item_name` |
 | `bridge_bag_to_history(p_shipping_address_id, p_slip_url, p_is_merge_order)` | `/redeem` | `auth.uid()` | รวมของ In Bag ทั้งหมด (เปิดซองค้าง) ตัดสินส่งฟรี สร้าง `redeem_history` เปลี่ยน bag เป็น Shipped |

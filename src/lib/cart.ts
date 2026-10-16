@@ -6,6 +6,21 @@ export interface CartItem {
   price: number
   quantity: number
   imageUrl?: string
+  // บรรทัดโปรโมชัน: variantId = `promo:<promotionId>` (1 โปรต่อตะกร้า จำนวนล็อกไว้ 1)
+  // ราคาในบรรทัดนี้แค่แสดงผล place_order คำนวณใหม่ฝั่ง DB
+  promotionId?: string
+  promoVariantIds?: string[] // ซื้อ 1 แถม 1 = 2 ชิ้นที่เลือก · เหมา = ทุกชิ้นในโปร (ใช้เช็คสต็อกฝั่งหน้าเว็บ)
+}
+
+export function isPromoLine(item: CartItem) {
+  return Boolean(item.promotionId)
+}
+
+// ใส่โปรลงตะกร้า — ถ้ามีโปรเดียวกันอยู่แล้วจะแทนที่ (ไม่บวกจำนวน)
+export function addPromoToCart(item: CartItem) {
+  const cart = getCart().filter(i => i.variantId !== item.variantId)
+  cart.push({ ...item, quantity: 1 })
+  saveCart(cart)
 }
 
 export function getCart(): CartItem[] {

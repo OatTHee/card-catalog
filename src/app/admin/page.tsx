@@ -5,6 +5,7 @@ import { createClient } from '@supabase/supabase-js'
 import { revalidateCatalog } from '@/app/actions/revalidate'
 import { PREORDER_MODE_KEY, isPreorderModeOn } from '@/lib/preorder'
 import AnnouncementEditor from '@/components/AnnouncementEditor'
+import PromotionManager from '@/components/PromotionManager'
 import {
   DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent
 } from '@dnd-kit/core'
@@ -56,6 +57,7 @@ function buildShelf(list: any[]): Record<ShelfKey, any[]> {
 
 export default function AdminPage() {
   const [showManageVendors, setShowManageVendors] = useState(false)
+  const [showPromotions, setShowPromotions] = useState(false)
   const [editProduct, setEditProduct] = useState<any>(null)
   const [sellers, setSellers] = useState<any[]>([])
   const [showAddProduct, setShowAddProduct] = useState(false)
@@ -336,6 +338,10 @@ export default function AdminPage() {
                   className="text-sm bg-slate-700 text-white px-3 py-2 rounded-lg hover:bg-slate-800">
                   ⠿ จัดชั้นวาง
                 </button>
+                <button onClick={() => setShowPromotions(true)}
+                  className="text-sm bg-pink-100 text-pink-700 px-3 py-2 rounded-lg hover:bg-pink-200">
+                  🎁 โปรโมชัน
+                </button>
                 <button onClick={() => setShowManageVendors(true)}
                   className="text-sm bg-slate-100 text-slate-700 px-3 py-2 rounded-lg hover:bg-slate-200">
                   ร้านค้า
@@ -486,6 +492,9 @@ export default function AdminPage() {
             loadProducts()
           }}
         />
+      )}
+      {showPromotions && (
+        <PromotionManager products={products} onClose={() => setShowPromotions(false)} />
       )}
       {showManageVendors && (
         <ManageVendorsModal
