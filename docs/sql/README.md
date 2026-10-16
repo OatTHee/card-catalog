@@ -9,8 +9,15 @@ DB จริงคือ source of truth เสมอ (`select pg_get_functionde
 | 2 | `preorder_mode_backorder` | ข้อ 1 ช่วงพรีออเดอร์ตอนของหมด |
 | 3 | `announcement_setting` | ข้อ 2 ประกาศหน้าร้าน |
 | 4 | `promotions` | ข้อ 4 โปรเหมา / ซื้อ 1 แถม 1 |
+| 5 | `preorder_rule_by_type` | แก้กติกาช่วงพรี: พรีได้เฉพาะเซ็ต + สินค้าที่ติ๊ก `in_preorder_promo` |
 
-## ย้อนกลับ (ต้องย้อนจากตัวล่าสุดขึ้นไป: 4 → 3 → 2 → 1 และต้องขออนุมัติเจ้าของก่อนตามกฎ CLAUDE.md ข้อ 3)
+## ย้อนกลับ (ต้องย้อนจากตัวล่าสุดขึ้นไป: 5 → 4 → 3 → 2 → 1 และต้องขออนุมัติเจ้าของก่อนตามกฎ CLAUDE.md ข้อ 3)
+
+**5 preorder_rule_by_type**
+1. รัน `rollback/place_order_3_after_promotions.sql`
+2. ```sql
+   alter table public.products drop column in_preorder_promo;
+   ```
 
 **4 promotions**
 1. รัน `rollback/place_order_2_after_preorder_mode.sql`

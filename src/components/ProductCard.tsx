@@ -2,6 +2,7 @@
 
 import { addToCart } from '@/lib/cart'
 import { SHOP_CLOSED } from '@/lib/shopStatus'
+import { isBackorderEligible } from '@/lib/preorder'
 import { useState } from 'react'
 import Image from 'next/image'
 
@@ -9,8 +10,8 @@ export default function ProductCard({ product, preorderMode = false }: { product
   const [showModal, setShowModal] = useState(false)
 
   const isOfficial = product.sellers?.type === 'official'
-  // ช่วงพรีออเดอร์: สินค้าร้าน official ที่หมด ยังสั่งได้ในรูปแบบพรีออเดอร์
-  const canBackorder = preorderMode && isOfficial
+  // ช่วงพรีออเดอร์: สินค้าร้าน official ที่หมด สั่งพรีได้เฉพาะเซ็ต หรือที่แอดมินติ๊ก "อยู่ในโปรพรีออเดอร์"
+  const canBackorder = preorderMode && isOfficial && isBackorderEligible(product)
   const variants = product.product_variants ?? []
   const totalStock = variants.reduce((sum: number, v: any) => sum + v.stock, 0)
   const isAvailable = totalStock > 0

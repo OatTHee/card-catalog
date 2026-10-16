@@ -445,7 +445,8 @@ export default function AdminPage() {
                 <h2 className="font-semibold text-sm text-slate-700">ช่วงพรีออเดอร์</h2>
                 <p className="text-xs text-slate-500 mt-0.5">
                   เปิดแล้ว สินค้าร้าน official ที่หมด ลูกค้าสั่งเป็นพรีออเดอร์ได้ไม่จำกัด (ไม่ตัดสต็อก ส่งแยกรอบ ไปโผล่หน้า Pre-order)
-                  ถ้าสต็อกเหลือไม่พอ ส่วนที่เกินจะเป็นพรี · ยอดค้างดูได้ที่ &ldquo;ค้างพรี&rdquo; ในรายละเอียดสินค้า
+                  <b> เฉพาะเซ็ต และสินค้าที่ติ๊ก &ldquo;อยู่ในโปรพรีออเดอร์&rdquo;</b> — อย่างอื่นที่หมดขึ้น &ldquo;หมด&rdquo; ตามปกติ
+                  · ถ้าสต็อกเหลือไม่พอ ส่วนที่เกินจะเป็นพรี · ยอดค้างดูได้ที่ &ldquo;ค้างพรี&rdquo; ในรายละเอียดสินค้า
                 </p>
               </div>
               <button onClick={handleTogglePreorderMode} disabled={savingPreorderMode}
@@ -547,6 +548,7 @@ function AdminProductCard({ product, onClick }: { product: any, onClick: () => v
         <p className="text-[11px] text-slate-400 mb-0.5 flex flex-wrap gap-1 items-center">
           <span>{typeLabel(product)}</span>
           {product.is_preorder && <span className="text-orange-600 bg-orange-50 border border-orange-200 rounded px-1">พรีออเดอร์</span>}
+          {product.in_preorder_promo && <span className="text-orange-700 bg-orange-100 border border-orange-300 rounded px-1">โปรพรี</span>}
           {product.is_for_redeem && <span className="text-amber-600 bg-amber-50 border border-amber-200 rounded px-1">แลกแต้ม</span>}
           {!product.is_for_sale && <span className="text-slate-500 bg-slate-100 border border-slate-200 rounded px-1">ไม่ขาย</span>}
         </p>
@@ -653,6 +655,7 @@ function ProductDetailModal({ product, onClose, onEdit, onDelete, onToggleAvaila
             <p className="text-xs text-slate-500 mt-0.5">{product.sellers?.name ?? 'ยังไม่ได้ตั้งร้าน'} · {typeLabel(product)}</p>
             <div className="flex flex-wrap gap-1 mt-2 text-[11px]">
               {product.is_preorder && <span className="text-orange-600 bg-orange-50 border border-orange-200 rounded px-1.5 py-0.5">พรีออเดอร์</span>}
+              {product.in_preorder_promo && <span className="text-orange-700 bg-orange-100 border border-orange-300 rounded px-1.5 py-0.5">โปรพรี</span>}
               {product.is_for_redeem && <span className="text-amber-600 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">แลกแต้ม</span>}
               {!product.is_for_sale && <span className="text-slate-500 bg-slate-100 border border-slate-200 rounded px-1.5 py-0.5">ไม่ได้ตั้งขาย</span>}
               <span className={`rounded px-1.5 py-0.5 border ${stock > 0 ? 'text-slate-600 bg-slate-50 border-slate-200' : 'text-red-500 bg-red-50 border-red-200'}`}>
@@ -805,6 +808,7 @@ function AddProductModal({ sellers, onClose, onSaved }: {
   const [isForSale, setIsForSale] = useState(true)
   const [isForRedeem, setIsForRedeem] = useState(false)
   const [isPreorder, setIsPreorder] = useState(false)
+  const [inPreorderPromo, setInPreorderPromo] = useState(false)
 
   function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
   const file = e.target.files?.[0]
@@ -839,7 +843,7 @@ function AddProductModal({ sellers, onClose, onSaved }: {
 
   const { data: product, error } = await supabase
     .from('products')
-    .insert({ name, type, seller_id: sellerId, description, image_url: imageUrl, is_available: true, is_for_sale: isForSale, is_for_redeem: isForRedeem, is_preorder: isPreorder })
+    .insert({ name, type, seller_id: sellerId, description, image_url: imageUrl, is_available: true, is_for_sale: isForSale, is_for_redeem: isForRedeem, is_preorder: isPreorder, in_preorder_promo: inPreorderPromo })
     .select()
     .single()
 
@@ -941,7 +945,11 @@ if (validVariants.length > 0) {
             </label>
             <label className="flex items-center gap-2 text-sm text-gray-700">
               <input type="checkbox" checked={isPreorder} onChange={e => setIsPreorder(e.target.checked)} />
-              📦 สินค้าพรีออเดอร์
+              📦 สินค้าพรีออเดอร์ (ถาวร)
+            </label>
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input type="checkbox" checked={inPreorderPromo} onChange={e => setInPreorderPromo(e.target.checked)} />
+              🏷️ อยู่ในโปรพรีออเดอร์
             </label>
           </div>
           {isPreorder && (
@@ -950,6 +958,11 @@ if (validVariants.length > 0) {
               และถ้าลูกค้าสั่งปนกับสินค้าในสต็อกจะคิดค่าส่ง 2 เท่า เว้นแต่ลูกค้าติ๊กให้ส่งพร้อมกัน
             </p>
           )}
+          <p className="text-[11px] text-gray-500 -mt-1">
+            🏷️ <b>อยู่ในโปรพรีออเดอร์</b> = ตอนเปิด &ldquo;ช่วงพรีออเดอร์&rdquo; ถ้าของหมด ลูกค้ายังสั่งพรีได้ (ไม่ตัดสต็อก)
+            · สินค้าประเภทเซ็ตพรีได้อยู่แล้วไม่ต้องติ๊ก · ปิดช่วงพรีออเดอร์แล้วช่องนี้ไม่มีผล
+            · คนละอย่างกับ 📦 สินค้าพรีออเดอร์ (ถาวร)
+          </p>
 <div>
   <label className="text-sm text-gray-600">รูปสินค้า</label>
   <input
@@ -1070,6 +1083,7 @@ const [imagePreview, setImagePreview] = useState<string>(product.image_url ?? ''
   const [isForSale, setIsForSale] = useState(product.is_for_sale ?? true)
   const [isForRedeem, setIsForRedeem] = useState(product.is_for_redeem ?? false)
   const [isPreorder, setIsPreorder] = useState(product.is_preorder ?? false)
+  const [inPreorderPromo, setInPreorderPromo] = useState(product.in_preorder_promo ?? false)
   const [gachaConfigVariant, setGachaConfigVariant] = useState<any>(null)
 function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
   const file = e.target.files?.[0]
@@ -1119,7 +1133,7 @@ function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
 
   await supabase
     .from('products')
-    .update({ name, type, seller_id: sellerId, description, image_url: imageUrl, is_for_sale: isForSale, is_for_redeem: isForRedeem, is_preorder: isPreorder })
+    .update({ name, type, seller_id: sellerId, description, image_url: imageUrl, is_for_sale: isForSale, is_for_redeem: isForRedeem, is_preorder: isPreorder, in_preorder_promo: inPreorderPromo })
     .eq('id', product.id)
 
   for (const v of variants) {
@@ -1215,7 +1229,11 @@ function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
             </label>
             <label className="flex items-center gap-2 text-sm text-gray-700">
               <input type="checkbox" checked={isPreorder} onChange={e => setIsPreorder(e.target.checked)} />
-              📦 สินค้าพรีออเดอร์
+              📦 สินค้าพรีออเดอร์ (ถาวร)
+            </label>
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input type="checkbox" checked={inPreorderPromo} onChange={e => setInPreorderPromo(e.target.checked)} />
+              🏷️ อยู่ในโปรพรีออเดอร์
             </label>
           </div>
           {isPreorder && (
@@ -1224,6 +1242,11 @@ function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
               และถ้าลูกค้าสั่งปนกับสินค้าในสต็อกจะคิดค่าส่ง 2 เท่า เว้นแต่ลูกค้าติ๊กให้ส่งพร้อมกัน
             </p>
           )}
+          <p className="text-[11px] text-gray-500 -mt-1">
+            🏷️ <b>อยู่ในโปรพรีออเดอร์</b> = ตอนเปิด &ldquo;ช่วงพรีออเดอร์&rdquo; ถ้าของหมด ลูกค้ายังสั่งพรีได้ (ไม่ตัดสต็อก)
+            · สินค้าประเภทเซ็ตพรีได้อยู่แล้วไม่ต้องติ๊ก · ปิดช่วงพรีออเดอร์แล้วช่องนี้ไม่มีผล
+            · คนละอย่างกับ 📦 สินค้าพรีออเดอร์ (ถาวร)
+          </p>
 <div>
   <label className="text-sm text-gray-600">รูปสินค้า</label>
   <input
