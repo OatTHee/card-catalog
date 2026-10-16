@@ -38,8 +38,8 @@ export default function RedeemPage() {
     setLoading(true)
     const [{ data: profile }, { data: prods }, { data: variants }, { data: bag }, { data: rolls }] = await Promise.all([
       supabase.from('customers').select('points').eq('id', userId).maybeSingle(),
-      supabase.from('products').select('*').eq('is_for_redeem', true).order('sort_order', { ascending: true }),
-      supabase.from('product_variants').select('*').not('redeem_points', 'is', null).order('sort_order', { ascending: true }),
+      supabase.from('products').select('*').eq('is_for_redeem', true).is('deleted_at', null).order('sort_order', { ascending: true }),
+      supabase.from('product_variants').select('*').not('redeem_points', 'is', null).is('deleted_at', null).order('sort_order', { ascending: true }),
       supabase.from('bag').select('*').eq('customer_id', userId).eq('status', 'In Bag').order('created_at', { ascending: false }),
       supabase.from('gacha_rolls').select('bag_id').eq('customer_id', userId)
     ])

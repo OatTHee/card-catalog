@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import Header from '@/components/Header'
+import { sortOrderItems } from '@/lib/orderItems'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -38,7 +39,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
     const { data: addrData } = await supabase.from('shipping_addresses').select('*').eq('id', orderData.shipping_address_id).single()
 
     setOrder(orderData)
-    setItems(itemsData ?? [])
+    setItems(sortOrderItems(itemsData ?? []))
     setAddress(addrData)
     setLoading(false)
   }

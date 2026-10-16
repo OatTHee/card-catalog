@@ -5,10 +5,12 @@ import { SHOP_CLOSED } from '@/lib/shopStatus'
 import { useState } from 'react'
 import Image from 'next/image'
 
-export default function ProductCard({ product }: { product: any }) {
+export default function ProductCard({ product, preorderMode = false }: { product: any, preorderMode?: boolean }) {
   const [showModal, setShowModal] = useState(false)
 
   const isOfficial = product.sellers?.type === 'official'
+  // ช่วงพรีออเดอร์: สินค้าร้าน official ที่หมด ยังสั่งได้ในรูปแบบพรีออเดอร์
+  const canBackorder = preorderMode && isOfficial
   const variants = product.product_variants ?? []
   const totalStock = variants.reduce((sum: number, v: any) => sum + v.stock, 0)
   const isAvailable = totalStock > 0
@@ -46,8 +48,8 @@ export default function ProductCard({ product }: { product: any }) {
           <h3 className="font-semibold text-sm text-gray-800 leading-tight mb-1">{product.name}</h3>
           <div className="flex items-center justify-between mt-2">
             <span className="text-blue-600 font-bold text-sm">{minPrice ? `฿${minPrice}` : '-'}</span>
-            <span className={`text-xs px-2 py-0.5 rounded-full ${isAvailable ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
-  {isAvailable ? 'มีสินค้า' : 'หมด'}
+            <span className={`text-xs px-2 py-0.5 rounded-full ${isAvailable ? 'bg-green-50 text-green-600' : canBackorder ? 'bg-orange-50 text-orange-600' : 'bg-gray-100 text-gray-400'}`}>
+  {isAvailable ? 'มีสินค้า' : canBackorder ? 'พรีออเดอร์' : 'หมด'}
 </span>
           </div>
         </div>
@@ -57,6 +59,7 @@ export default function ProductCard({ product }: { product: any }) {
         <ProductModal
           product={product}
           isOfficial={isOfficial}
+          canBackorder={canBackorder}
           variants={variants}
           onClose={() => setShowModal(false)}
         />
@@ -65,9 +68,10 @@ export default function ProductCard({ product }: { product: any }) {
   )
 }
 
-function ProductModal({ product, isOfficial, variants, onClose }: {
+function ProductModal({ product, isOfficial, canBackorder, variants, onClose }: {
   product: any
   isOfficial: boolean
+  canBackorder: boolean
   variants: any[]
   onClose: () => void
 }) {
@@ -144,11 +148,11 @@ function ProductModal({ product, isOfficial, variants, onClose }: {
           <button
             key={v.id}
             onClick={() => setSelectedVariantId(v.id)}
-            disabled={v.stock === 0}
+            disabled={v.stock === 0 && !canBackorder}
             className={`w-full flex justify-between items-center px-3 py-2 rounded-lg border text-sm transition-colors ${
               selectedVariantId === v.id
                 ? 'border-blue-400 bg-blue-50 text-blue-700'
-                : v.stock === 0
+                : v.stock === 0 && !canBackorder
                 ? 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed'
                 : 'border-gray-200 hover:border-blue-300'
             }`}
@@ -159,8 +163,9 @@ function ProductModal({ product, isOfficial, variants, onClose }: {
               <span>{v.name}</span>
             </div>
             <span className="font-bold text-right">
-              <span className="block">{v.stock === 0 ? 'หมด' : `฿${v.price}`}</span>
+              <span className="block">{v.stock === 0 && !canBackorder ? 'หมด' : `฿${v.price}`}</span>
               {v.stock > 0 && <span className="text-xs font-normal text-gray-400">เหลือ {v.stock}</span>}
+              {v.stock <= 0 && canBackorder && <span className="text-xs font-normal text-orange-600">พรีออเดอร์</span>}
             </span>
           </button>
         ))}
@@ -185,6 +190,18 @@ function ProductModal({ product, isOfficial, variants, onClose }: {
         <button disabled className="w-full py-3 rounded-xl bg-gray-100 text-gray-400 cursor-not-allowed">
           ปิดการขายชั่วคราว
         </button>
+      ) : !isAvailable && canBackorder ? (
+        <>
+          <p className="text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded-lg px-2 py-1.5 mb-2">
+            📦 สินค้าหมด สั่งเป็นพรีออเดอร์ได้ — ส่งแยกรอบกับสินค้าพร้อมส่ง
+          </p>
+          <button
+            onClick={handleAddToCart}
+            className={`w-full py-3 rounded-xl font-medium transition-colors ${added ? 'bg-green-500 text-white' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
+          >
+            {added ? '✓ เพิ่มในตะกร้าแล้ว' : '+ สั่งพรีออเดอร์'}
+          </button>
+        </>
       ) : !isAvailable ? (
         <button disabled className="w-full py-3 rounded-xl bg-gray-100 text-gray-400 cursor-not-allowed">
           หมดแล้ว

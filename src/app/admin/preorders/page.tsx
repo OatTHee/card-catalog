@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
+import { sortOrderItems } from '@/lib/orderItems'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -53,7 +54,7 @@ export default function AdminPreordersPage() {
     const withItems = await Promise.all((ordersData ?? []).map(async order => {
       const { data: items } = await supabase.from('order_items').select('*').eq('order_id', order.id)
       const { data: addr } = await supabase.from('shipping_addresses').select('*').eq('id', order.shipping_address_id).single()
-      const all = items ?? []
+      const all = sortOrderItems(items ?? [])
       const hasPre = all.some((i: any) => i.is_preorder)
       const hasNormal = all.some((i: any) => !i.is_preorder)
       const isSplit = hasPre && hasNormal && !order.ship_together
@@ -156,6 +157,7 @@ export default function AdminPreordersPage() {
                     <p key={item.id} className="text-xs text-gray-500">
                       {item.name} x{item.quantity} — ฿{item.price * item.quantity}
                       {!item.is_preorder && <span className="ml-1 text-blue-500">(ของพร้อมส่ง)</span>}
+                      {item.is_backorder && <span className="ml-1 text-orange-600">(สั่งตอนของหมด — ยังไม่ได้ตัดสต็อก)</span>}
                     </p>
                   ))}
                 </div>

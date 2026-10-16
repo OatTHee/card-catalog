@@ -3,6 +3,9 @@ import { uploadImage } from '@/lib/upload'
 import { useEffect, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { revalidateCatalog } from '@/app/actions/revalidate'
+import { PREORDER_MODE_KEY, isPreorderModeOn } from '@/lib/preorder'
+import AnnouncementEditor from '@/components/AnnouncementEditor'
+import PromotionManager from '@/components/PromotionManager'
 import {
   DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent
 } from '@dnd-kit/core'
@@ -54,12 +57,15 @@ function buildShelf(list: any[]): Record<ShelfKey, any[]> {
 
 export default function AdminPage() {
   const [showManageVendors, setShowManageVendors] = useState(false)
+  const [showPromotions, setShowPromotions] = useState(false)
   const [editProduct, setEditProduct] = useState<any>(null)
   const [sellers, setSellers] = useState<any[]>([])
   const [showAddProduct, setShowAddProduct] = useState(false)
   const [products, setProducts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [shippingFee, setShippingFee] = useState('')
+  const [preorderMode, setPreorderMode] = useState(false)
+  const [savingPreorderMode, setSavingPreorderMode] = useState(false)
 
   // โหมดการใช้งาน: 'manage' = ค้นหา/กรอง/แก้ไข  |  'shelf' = จัดชั้นวาง (ลากเรียง)
   const [mode, setMode] = useState<'manage' | 'shelf'>('manage')
@@ -98,46 +104,79 @@ export default function AdminPage() {
     alert('บันทึกแล้ว')
   }
 
+  async function handleTogglePreorderMode() {
+    const next = !preorderMode
+    const msg = next
+      ? 'เปิดช่วงพรีออเดอร์?\nสินค้าร้าน official ที่หมด ลูกค้าจะสั่งเป็นพรีออเดอร์ได้ (ไม่ตัดสต็อก)'
+      : 'ปิดช่วงพรีออเดอร์?\nสินค้าที่หมดจะกลับไปสั่งไม่ได้ (ออเดอร์พรีที่สั่งไปแล้วไม่กระทบ)'
+    if (!confirm(msg)) return
+    setSavingPreorderMode(true)
+    const { error } = await supabase
+      .from('settings')
+      .update({ value: next ? 'on' : 'off' })
+      .eq('key', PREORDER_MODE_KEY)
+    setSavingPreorderMode(false)
+    if (error) {
+      alert('บันทึกไม่สำเร็จ: ' + error.message)
+      return
+    }
+    setPreorderMode(next)
+    revalidateCatalog()
+  }
+
   async function loadProducts() {
     const { data: productsData } = await supabase
       .from('products')
       .select('*, sellers(*), product_variants(*)')
+      .is('deleted_at', null)
       .order('sort_order', { ascending: true })
 
     const { data: sellersData } = await supabase.from('sellers').select('*')
     const { data: settings } = await supabase.from('settings').select('value').eq('key', 'shipping_fee').single()
+    const { data: modeRow } = await supabase.from('settings').select('value').eq('key', PREORDER_MODE_KEY).maybeSingle()
 
+    // นับของพรีที่สั่งตอนของหมด (ไม่ได้ตัดสต็อก) ที่ยังค้างส่ง ต่อ variant
+    // ออเดอร์แยกส่ง ใช้ preorder_status ไม่งั้นใช้ status · ค้าง = ยังไม่ส่งถึงและยังไม่ยกเลิก
+    const { data: backorders } = await supabase
+      .from('order_items')
+      .select('variant_id, quantity, orders(status, preorder_status)')
+      .eq('is_backorder', true)
+    const pendingByVariant = new Map<string, number>()
+    for (const b of (backorders ?? []) as { variant_id: string | null, quantity: number, orders: unknown }[]) {
+      const o = (Array.isArray(b.orders) ? b.orders[0] : b.orders) as { status?: string, preorder_status?: string | null } | null
+      const st = o?.preorder_status ?? o?.status
+      if (!b.variant_id || st === 'delivered' || st === 'cancelled') continue
+      pendingByVariant.set(b.variant_id, (pendingByVariant.get(b.variant_id) ?? 0) + b.quantity)
+    }
+
+    // ตัวเลือกที่ถูกลบ (deleted_at) ไม่ต้องโชว์ในหลังบ้าน
     const sorted = (productsData ?? []).map(p => ({
       ...p,
-      product_variants: [...(p.product_variants ?? [])].sort((a: any, b: any) => a.sort_order - b.sort_order)
+      product_variants: (p.product_variants ?? [])
+        .filter((v: { deleted_at?: string | null }) => !v.deleted_at)
+        .map((v: { id: string }) => ({ ...v, backorder_pending: pendingByVariant.get(v.id) ?? 0 }))
+        .sort((a: any, b: any) => a.sort_order - b.sort_order)
     }))
 
     setProducts(sorted)
     setSellers(sellersData ?? [])
     if (settings) setShippingFee(settings.value)
+    setPreorderMode(isPreorderModeOn(modeRow?.value))
     setLoading(false)
   }
 
   async function handleDelete(productId: string) {
-    if (!confirm('ลบสินค้านี้จริงไหม?')) return
+    if (!confirm('ลบสินค้านี้ออกจากร้านจริงไหม?\n(ออเดอร์และประวัติที่ลูกค้าเคยสั่งจะยังอยู่ครบ)')) return
 
-    const { data: variants } = await supabase
-      .from('product_variants')
-      .select('id')
-      .eq('product_id', productId)
-
-    const variantIds = (variants ?? []).map(v => v.id)
-
-    if (variantIds.length > 0) {
-      await supabase.from('set_items').delete().in('variant_id', variantIds)
-    }
-
-    await supabase.from('product_variants').delete().eq('product_id', productId)
-
-    const { error } = await supabase.from('products').delete().eq('id', productId)
+    // ไม่ลบแถวจริง (order_items / bag / stock_transactions อ้างถึง variant อยู่)
+    // แค่ประทับ deleted_at แล้วทุกหน้ากรองทิ้ง สินค้าจะหายไปจากร้าน
+    const { error } = await supabase
+      .from('products')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', productId)
 
     if (error) {
-      alert('ลบไม่ได้ เนื่องจากมี order ที่เคยสั่งซื้อสินค้านี้อยู่\nแนะนำให้ซ่อนสินค้าแทนครับ')
+      alert('ลบสินค้าไม่สำเร็จ: ' + error.message)
       return
     }
 
@@ -299,6 +338,10 @@ export default function AdminPage() {
                   className="text-sm bg-slate-700 text-white px-3 py-2 rounded-lg hover:bg-slate-800">
                   ⠿ จัดชั้นวาง
                 </button>
+                <button onClick={() => setShowPromotions(true)}
+                  className="text-sm bg-pink-100 text-pink-700 px-3 py-2 rounded-lg hover:bg-pink-200">
+                  🎁 โปรโมชัน
+                </button>
                 <button onClick={() => setShowManageVendors(true)}
                   className="text-sm bg-slate-100 text-slate-700 px-3 py-2 rounded-lg hover:bg-slate-200">
                   ร้านค้า
@@ -394,6 +437,28 @@ export default function AdminPage() {
             </div>
           </div>
         )}
+
+        {mode === 'manage' && (
+          <div className="mt-4 bg-white rounded-xl p-4 border border-slate-200">
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex-1 min-w-[200px]">
+                <h2 className="font-semibold text-sm text-slate-700">ช่วงพรีออเดอร์</h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  เปิดแล้ว สินค้าร้าน official ที่หมด ลูกค้าสั่งเป็นพรีออเดอร์ได้ไม่จำกัด (ไม่ตัดสต็อก ส่งแยกรอบ ไปโผล่หน้า Pre-order)
+                  ถ้าสต็อกเหลือไม่พอ ส่วนที่เกินจะเป็นพรี · ยอดค้างดูได้ที่ &ldquo;ค้างพรี&rdquo; ในรายละเอียดสินค้า
+                </p>
+              </div>
+              <button onClick={handleTogglePreorderMode} disabled={savingPreorderMode}
+                className={`text-sm px-4 py-2 rounded-lg disabled:opacity-50 ${preorderMode
+                  ? 'bg-orange-500 text-white hover:bg-orange-600'
+                  : 'bg-slate-200 text-slate-600 hover:bg-slate-300'}`}>
+                {savingPreorderMode ? 'กำลังบันทึก...' : preorderMode ? '📦 เปิดอยู่ — กดเพื่อปิด' : 'ปิดอยู่ — กดเพื่อเปิด'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {mode === 'manage' && <AnnouncementEditor />}
       </div>
 
       {detail && (
@@ -427,6 +492,9 @@ export default function AdminPage() {
             loadProducts()
           }}
         />
+      )}
+      {showPromotions && (
+        <PromotionManager products={products} onClose={() => setShowPromotions(false)} />
       )}
       {showManageVendors && (
         <ManageVendorsModal
@@ -691,6 +759,7 @@ function VariantRow({ variant, onStockUpdate }: { variant: any, onStockUpdate: (
         <p className="text-xs text-slate-400">
           ฿{variant.price}
           {variant.redeem_points != null && <span className="text-amber-500"> · ✨{variant.redeem_points}</span>}
+          {variant.backorder_pending > 0 && <span className="text-orange-600"> · ค้างพรี {variant.backorder_pending}</span>}
         </p>
       </div>
       <div className="flex items-center gap-2 shrink-0">
@@ -1025,7 +1094,16 @@ function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
   }
 
   async function handleDeleteVariant(variantId: string) {
-    await supabase.from('product_variants').delete().eq('id', variantId)
+    if (!confirm('ลบตัวเลือกนี้ออกจากร้านจริงไหม?')) return
+    // soft delete เหมือนลบสินค้า — ออเดอร์เก่า/ประวัติสต็อกยังอยู่ครบ
+    const { error } = await supabase
+      .from('product_variants')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', variantId)
+    if (error) {
+      alert('ลบตัวเลือกไม่สำเร็จ: ' + error.message)
+      return
+    }
     setVariants(variants.filter(v => v.id !== variantId))
     revalidateCatalog()
   }
