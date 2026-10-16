@@ -5,6 +5,7 @@ import { getCart, removeFromCart, updateQuantity, CartItem } from '@/lib/cart'
 import { createClient } from '@supabase/supabase-js'
 import Header from '@/components/Header'
 import { SHOP_CLOSED } from '@/lib/shopStatus'
+import { loadVariantStockInfo, splitLine, splitWarning, VariantStockInfo } from '@/lib/preorder'
 import Footer from '@/components/Footer'
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -16,6 +17,7 @@ export default function CartPage() {
   const [shippingFee, setShippingFee] = useState(40)
   const [loading, setLoading] = useState(true)
   const [session, setSession] = useState<any>(null)
+  const [stockInfo, setStockInfo] = useState<Map<string, VariantStockInfo>>(new Map())
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -25,9 +27,14 @@ export default function CartPage() {
   }, [])
 
   async function loadCart() {
-    const { data } = await supabase.from('settings').select('value').eq('key', 'shipping_fee').single()
+    const currentCart = getCart()
+    const [{ data }, { info }] = await Promise.all([
+      supabase.from('settings').select('value').eq('key', 'shipping_fee').single(),
+      loadVariantStockInfo(supabase, currentCart.map(i => i.variantId))
+    ])
     if (data) setShippingFee(Number(data.value))
-    setCart(getCart())
+    setStockInfo(info)
+    setCart(currentCart)
     setLoading(false)
   }
 
@@ -71,6 +78,13 @@ export default function CartPage() {
                     <p className="font-medium text-sm text-gray-800">{item.productName}</p>
                     <p className="text-xs text-gray-400">{item.variantName}</p>
                     <p className="text-blue-600 font-bold text-sm mt-1">฿{item.price}</p>
+                    {(() => {
+                      const warning = splitWarning(
+                        splitLine(stockInfo.get(item.variantId), item.quantity),
+                        stockInfo.get(item.variantId)?.isPreorderProduct ?? false
+                      )
+                      return warning && <p className="text-xs text-orange-700 mt-1">⚠️ {warning}</p>
+                    })()}
                   </div>
                   <div className="flex flex-col items-end gap-2">
                     <button onClick={() => handleRemove(item.variantId)} className="text-xs text-red-400 hover:text-red-600">ลบ</button>

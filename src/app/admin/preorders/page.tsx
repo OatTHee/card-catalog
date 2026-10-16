@@ -156,6 +156,7 @@ export default function AdminPreordersPage() {
                     <p key={item.id} className="text-xs text-gray-500">
                       {item.name} x{item.quantity} — ฿{item.price * item.quantity}
                       {!item.is_preorder && <span className="ml-1 text-blue-500">(ของพร้อมส่ง)</span>}
+                      {item.is_backorder && <span className="ml-1 text-orange-600">(สั่งตอนของหมด — ยังไม่ได้ตัดสต็อก)</span>}
                     </p>
                   ))}
                 </div>

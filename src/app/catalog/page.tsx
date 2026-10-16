@@ -4,6 +4,7 @@ import Header from '@/components/Header'
 import { createClient } from '@supabase/supabase-js'
 import Footer from '@/components/Footer'
 import ProductCard from '@/components/ProductCard'
+import { PREORDER_MODE_KEY, isPreorderModeOn } from '@/lib/preorder'
 
 // PostgREST สะดุดเป็นครั้งคราว (504 Gateway Timeout) ทั้งที่ข้อมูลเล็กมาก
 // เคยทำให้ sellers พังจนแคตตาล็อกว่างทั้งหน้า และเคยทำให้ build บน Vercel ล้ม
@@ -31,7 +32,7 @@ async function getProducts() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
   )
 
-  const [sellersRes, productsRes, variantsRes] = await Promise.all([
+  const [sellersRes, productsRes, variantsRes, settingsRes] = await Promise.all([
     withRetry(() => supabase.from('sellers').select('id, type')),
     withRetry(() =>
       supabase
@@ -48,6 +49,7 @@ async function getProducts() {
         .is('deleted_at', null)
         .order('sort_order', { ascending: true })
     ),
+    withRetry(() => supabase.from('settings').select('key, value').in('key', [PREORDER_MODE_KEY])),
   ])
 
   // สำคัญ: ถ้า query ไหนพัง ต้อง throw ไม่ใช่ปล่อยให้ render เป็นหน้าว่าง
@@ -57,6 +59,7 @@ async function getProducts() {
     sellersRes.error && `sellers: ${(sellersRes.error as any)?.message ?? sellersRes.error}`,
     productsRes.error && `products: ${(productsRes.error as any)?.message ?? productsRes.error}`,
     variantsRes.error && `product_variants: ${(variantsRes.error as any)?.message ?? variantsRes.error}`,
+    settingsRes.error && `settings: ${(settingsRes.error as { message?: string })?.message ?? settingsRes.error}`,
   ].filter(Boolean)
 
   if (failed.length > 0) {
@@ -66,16 +69,20 @@ async function getProducts() {
   const sellers = sellersRes.data ?? []
   const products = productsRes.data ?? []
   const variants = variantsRes.data ?? []
+  const settings = new Map((settingsRes.data ?? []).map(s => [s.key, s.value]))
 
-  return products.map(product => ({
-    ...product,
-    sellers: sellers.find(s => s.id === product.seller_id) ?? null,
-    product_variants: variants.filter(v => v.product_id === product.id)
-  }))
+  return {
+    products: products.map(product => ({
+      ...product,
+      sellers: sellers.find(s => s.id === product.seller_id) ?? null,
+      product_variants: variants.filter(v => v.product_id === product.id)
+    })),
+    preorderMode: isPreorderModeOn(settings.get(PREORDER_MODE_KEY)),
+  }
 }
 
 export default async function CatalogPage() {
-  const products = await getProducts()
+  const { products, preorderMode } = await getProducts()
 
   const available = products.filter(p => p.is_available)
   const official = available.filter(p => p.sellers?.type === 'official')
@@ -89,9 +96,9 @@ export default async function CatalogPage() {
     <main className="min-h-screen bg-blue-50">
 <Header />
       <div className="max-w-5xl mx-auto px-4 py-8">
-        <Section title="สินค้ากลุ่ม" subtitle="ผลิตภัณฑ์ของทางกลุุ่ม และร้าน มาสเตอร์ ดี ไฟท์เตอร์" products={[...official, ...orphan]} color="blue" />
-        <Section title="สินค้าแอดมิน" subtitle="ของแอดมิน" products={admin} color="sky" />
-        <Section title="สินค้ามือสอง" subtitle="ร้านค้าอื่นๆ" products={vendor} color="slate" />
+        <Section title="สินค้ากลุ่ม" subtitle="ผลิตภัณฑ์ของทางกลุุ่ม และร้าน มาสเตอร์ ดี ไฟท์เตอร์" products={[...official, ...orphan]} color="blue" preorderMode={preorderMode} />
+        <Section title="สินค้าแอดมิน" subtitle="ของแอดมิน" products={admin} color="sky" preorderMode={preorderMode} />
+        <Section title="สินค้ามือสอง" subtitle="ร้านค้าอื่นๆ" products={vendor} color="slate" preorderMode={preorderMode} />
       </div>
       <Footer />
     </main>
@@ -99,11 +106,12 @@ export default async function CatalogPage() {
 }
 
 
-function Section({ title, subtitle, products, color }: {
+function Section({ title, subtitle, products, color, preorderMode }: {
   title: string
   subtitle: string
   products: any[]
   color: string
+  preorderMode: boolean
 }) {
   if (products.length === 0) return null
 
@@ -124,7 +132,7 @@ function Section({ title, subtitle, products, color }: {
       </div>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {products.map(product => (
-          <ProductCard key={product.id} product={product} />
+          <ProductCard key={product.id} product={product} preorderMode={preorderMode} />
         ))}
       </div>
     </section>

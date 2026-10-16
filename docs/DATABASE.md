@@ -16,12 +16,12 @@ Project ref `joceifkrecfcntbjpsvn` · Postgres 17 · schema `public` · RLS เ�
 | `products` | 47 | สินค้า `type` ∈ `set \| single \| accessory \| gacha` · `is_available` (แสดง/ซ่อน), `is_for_sale` (โชว์ `/catalog`), `is_for_redeem` (โชว์ `/redeem`), `is_preorder`, `sort_order`, `seller_id`, `deleted_at` (soft delete) |
 | `product_variants` | 236 | ตัวเลือกย่อย `price`, `stock`, `image_url`, `sort_order`, `redeem_points` (null = แลกแต้มไม่ได้), `deleted_at` (soft delete) |
 | `set_items` | 0 | รายการการ์ดในเซ็ต — ว่าง, RLS ไม่มี policy (ใช้งานไม่ได้จาก client) แต่ `/admin` ลบแถวในนี้ตอนลบสินค้า |
-| `settings` | 1 | key/value text — มีแค่ `shipping_fee = 40` · (`redeem_free_shipping_threshold` ถูกอ่านแต่ **ยังไม่มีแถว** → default 40) |
+| `settings` | 2 | key/value text — `shipping_fee = 40`, `preorder_mode` (`on`\|`off` สวิตช์ช่วงพรีออเดอร์ในหน้า /admin) · (`redeem_free_shipping_threshold` ถูกอ่านแต่ **ยังไม่มีแถว** → default 40) · **ไม่มี INSERT policy** — key ใหม่ต้อง insert ด้วย SQL |
 | `user_profiles` | 2 | role `admin \| vendor` (+ `seller_id` ของ vendor) — ตอนนี้ admin 2 คน vendor 0 · `id` = `auth.users.id` |
 | `customers` | 146 | 1 แถวต่อผู้ใช้ที่ login (`id` = `auth.users.id`) · `points`, `exp`, `uid` (unique, จากระบบเก่า), `discord_id` (unique), `real_name`, `address_raw` (ที่อยู่แบบเก่า) |
 | `shipping_addresses` | 85 | ที่อยู่หลายที่ต่อคน `is_default` |
 | `orders` | 94 | `status` (CHECK `pending_payment\|paid\|shipping\|delivered\|cancelled`), `subtotal`, `shipping_fee`, `total`, `slip_url`, `tracking_number`, `stock_deducted`, `ship_together`, `preorder_status` (null ถ้าไม่แยกส่ง), `preorder_tracking_number`, `preorder_stock_deducted` |
-| `order_items` | 260 | `variant_id`, `name`, `price` (snapshot), `quantity`, `is_preorder` (snapshot) |
+| `order_items` | 260 | `variant_id`, `name`, `price` (snapshot), `quantity`, `is_preorder` (snapshot), `is_backorder` (สั่งตอนของหมดในช่วงพรีออเดอร์ = **ไม่ได้ตัดสต็อก**, `_apply_stock_delta` ข้ามบรรทัดนี้) |
 | `stock_transactions` | 808 | ledger สต็อก (trigger `log_stock_change` เขียนเมื่อ `product_variants.stock` เปลี่ยน แล้ว RPC แก้ `reason` ทีหลัง) |
 | `legacy_accounts` | 59 | ผู้เล่นจากระบบเก่า PK `uid` · `discord_id`, `points`, `exp`, `duels`, `champion`, `top3`, `top5`, `last_active`, `claimed_by`, `claimed_at` |
 | `player_stats` | 38 | สถิติแข่งของคนที่ claim แล้ว PK `user_id` |
@@ -46,7 +46,7 @@ Foreign key ที่มีผลตอนลบ (ตรวจซ้ำ 16 ต.�
 
 | RPC | เรียกจาก | เช็คสิทธิ์ | ทำอะไร |
 |---|---|---|---|
-| `place_order(p_shipping_address_id, p_items, p_slip_url, p_ship_together)` | `/checkout` | `auth.uid()` + ที่อยู่ต้องเป็นของตัวเอง | ล็อก variant (`FOR UPDATE`) เช็คสต็อก, ราคา/ค่าส่งจาก DB, สร้าง order + items, ตัดสต็อก, คืน `{order_id, total, has_preorder, is_split, …}` |
+| `place_order(p_shipping_address_id, p_items, p_slip_url, p_ship_together)` | `/checkout` | `auth.uid()` + ที่อยู่ต้องเป็นของตัวเอง | ล็อก variant (`FOR UPDATE`) เช็คสต็อก, ราคา/ค่าส่งจาก DB, สร้าง order + items, ตัดสต็อก, คืน `{order_id, total, has_preorder, is_split, has_backorder, …}` · ปฏิเสธของที่ `deleted_at` · ถ้า `preorder_mode = on` + ร้าน official + สต็อกไม่พอ → แยกบรรทัด: ส่วนที่มีของ (ตัดสต็อก) + ส่วนเกิน (`is_preorder = is_backorder = true` ไม่ตัดสต็อก) |
 | `redeem_to_bag(p_items)` | `RedeemCard` | `auth.uid()` | เช็คสต็อก/แต้ม ตัดสต็อก หักแต้ม ใส่ bag — **⚠️ ใช้ `points` ที่ client ส่งมา ดู KNOWN_ISSUES #S2** |
 | `open_gacha_pack(p_bag_id)` | `/redeem` | เจ้าของ bag หรือ admin | สุ่มรางวัลผ่าน `_resolve_gacha_pack` ต่อชื่อผลไว้ท้าย `bag.item_name` |
 | `bridge_bag_to_history(p_shipping_address_id, p_slip_url, p_is_merge_order)` | `/redeem` | `auth.uid()` | รวมของ In Bag ทั้งหมด (เปิดซองค้าง) ตัดสินส่งฟรี สร้าง `redeem_history` เปลี่ยน bag เป็น Shipped |

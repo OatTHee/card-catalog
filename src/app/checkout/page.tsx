@@ -5,6 +5,7 @@ import { createClient } from '@supabase/supabase-js'
 import { getCart, clearCart, CartItem } from '@/lib/cart'
 import Header from '@/components/Header'
 import { SHOP_CLOSED } from '@/lib/shopStatus'
+import { loadVariantStockInfo, splitLine, splitWarning, VariantStockInfo } from '@/lib/preorder'
 import Footer from '@/components/Footer'
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -37,8 +38,8 @@ export default function CheckoutPage() {
   const [submitting, setSubmitting] = useState(false)
   const [session, setSession] = useState<any>(null)
   const [showQR, setShowQR] = useState(false)
-  // variantId ของสินค้าพรีออเดอร์ในตะกร้า (ดึงสดจาก DB ไม่เชื่อค่าที่ค้างใน localStorage)
-  const [preorderIds, setPreorderIds] = useState<Set<string>>(new Set())
+  // สต็อก/สถานะพรีของ variant ในตะกร้า (ดึงสดจาก DB ไม่เชื่อค่าที่ค้างใน localStorage)
+  const [stockInfo, setStockInfo] = useState<Map<string, VariantStockInfo>>(new Map())
   const [shipTogether, setShipTogether] = useState(false)
 
   useEffect(() => {
@@ -53,21 +54,15 @@ export default function CheckoutPage() {
     const currentCart = getCart()
     const variantIds = currentCart.map(i => i.variantId)
 
-    const [{ data: addrs }, { data: settings }, { data: variantRows }] = await Promise.all([
+    const [{ data: addrs }, { data: settings }, { info }] = await Promise.all([
       supabase.from('shipping_addresses').select('*').eq('customer_id', userId).order('is_default', { ascending: false }),
       supabase.from('settings').select('value').eq('key', 'shipping_fee').single(),
-      variantIds.length
-        ? supabase.from('product_variants').select('id, products(is_preorder)').in('id', variantIds)
-        : Promise.resolve({ data: [] as any[] })
+      loadVariantStockInfo(supabase, variantIds)
     ])
     setAddresses(addrs ?? [])
     if (addrs?.length) setSelectedAddress(addrs.find((a: any) => a.is_default)?.id || addrs[0].id)
     if (settings) setShippingFee(Number(settings.value))
-    setPreorderIds(new Set(
-      (variantRows ?? [])
-        .filter((v: any) => (Array.isArray(v.products) ? v.products[0]?.is_preorder : v.products?.is_preorder))
-        .map((v: any) => v.id as string)
-    ))
+    setStockInfo(info)
     setCart(currentCart)
     setLoading(false)
   }
@@ -86,7 +81,9 @@ export default function CheckoutPage() {
     for (const item of cart) {
       const { data: variant } = await supabase
         .from('product_variants').select('stock, name').eq('id', item.variantId).single()
-      if (!variant || variant.stock < item.quantity) {
+      // ช่วงพรีออเดอร์: ร้าน official สั่งเกินสต็อกได้ (ส่วนเกินเป็นพรี) — DB เช็คซ้ำอีกรอบ
+      const canBackorder = stockInfo.get(item.variantId)?.canBackorder ?? false
+      if (!variant || (variant.stock < item.quantity && !canBackorder)) {
         alert(`สินค้า ${item.variantName} มีไม่พอครับ (เหลือ ${variant?.stock ?? 0})`)
         setSubmitting(false)
         return
@@ -153,8 +150,10 @@ export default function CheckoutPage() {
   }
 
   const subtotal = cart.reduce((sum, i) => sum + i.price * i.quantity, 0)
-  const hasPreorder = cart.some(i => preorderIds.has(i.variantId))
-  const hasNormal = cart.some(i => !preorderIds.has(i.variantId))
+  // แบ่งแต่ละบรรทัดเป็น ส่วนพร้อมส่ง / ส่วนพรี ให้ตรงกับที่ place_order จะบันทึก
+  const splits = new Map(cart.map(i => [i.variantId, splitLine(stockInfo.get(i.variantId), i.quantity)]))
+  const hasPreorder = cart.some(i => (splits.get(i.variantId)?.preorder ?? 0) > 0)
+  const hasNormal = cart.some(i => (splits.get(i.variantId)?.ready ?? 0) > 0)
   const isMixed = hasPreorder && hasNormal
   // ปนกันแล้วไม่ได้ติ๊กส่งพร้อม = ส่ง 2 รอบ = ค่าส่ง 2 เท่า (ฝั่ง DB คิดซ้ำอีกรอบเป็นตัวตัดสิน)
   const effectiveShipping = isMixed && !shipTogether ? shippingFee * 2 : shippingFee
@@ -197,17 +196,24 @@ export default function CheckoutPage() {
         <div className="bg-white rounded-xl shadow-sm p-4">
           <h3 className="font-semibold text-gray-800 mb-3">รายการสินค้า</h3>
           <div className="space-y-2">
-            {cart.map(item => (
-              <div key={item.variantId} className="flex justify-between text-sm">
-                <span className="text-gray-600">
-                  {item.productName} - {item.variantName} x{item.quantity}
-                  {preorderIds.has(item.variantId) && (
-                    <span className="ml-1 text-[10px] text-orange-600 bg-orange-50 border border-orange-200 rounded px-1 py-0.5">พรีออเดอร์</span>
-                  )}
-                </span>
-                <span className="font-medium">฿{item.price * item.quantity}</span>
-              </div>
-            ))}
+            {cart.map(item => {
+              const split = splits.get(item.variantId) ?? { ready: item.quantity, preorder: 0 }
+              const warning = splitWarning(split, stockInfo.get(item.variantId)?.isPreorderProduct ?? false)
+              return (
+                <div key={item.variantId}>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">
+                      {item.productName} - {item.variantName} x{item.quantity}
+                      {split.preorder > 0 && (
+                        <span className="ml-1 text-[10px] text-orange-600 bg-orange-50 border border-orange-200 rounded px-1 py-0.5">พรีออเดอร์</span>
+                      )}
+                    </span>
+                    <span className="font-medium">฿{item.price * item.quantity}</span>
+                  </div>
+                  {warning && <p className="text-xs text-orange-700 mt-0.5">⚠️ {warning}</p>}
+                </div>
+              )
+            })}
           </div>
           {isMixed && (
             <div className="mt-3 border border-orange-200 bg-orange-50 rounded-lg p-3">
