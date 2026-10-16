@@ -81,7 +81,11 @@ SQL ในไฟล์นี้เป็น **ร่าง ยังไม่ไ
 - ตอนนี้แอดมินน่าจะใช้ที่อยู่จากแจ้งเตือน Discord แทน (ต้องถามเจ้าของว่าตั้งใจหรือไม่)
 - แนวทาง (ถ้าเจ้าของต้องการ): เพิ่ม policy SELECT `using (is_admin())` บน `shipping_addresses`
 
-### B3 🟡 ลบสินค้าใน `/admin` อาจลบไม่ครบ/ลบครึ่งเดียว (จากการอ่านโค้ด ยังไม่ได้ทดสอบ)
+### B3 🟡 ลบสินค้าใน `/admin` อาจลบไม่ครบ/ลบครึ่งเดียว — ✅ แก้แล้ว (branch `feature/shop-updates`)
+- แก้เป็น soft delete (`deleted_at`) ทั้งลบสินค้าและปุ่ม ✕ ลบ variant — ไม่ DELETE แถวจริงอีกแล้ว ดู `docs/DATABASE.md`
+- ข้อสังเกตที่ยังค้าง: `redeem_to_bag` ไม่ได้เช็ค `deleted_at` (หน้าเว็บซ่อนแล้ว แต่ยิง RPC ตรงยังแลกได้ — แก้พร้อม S2)
+
+เดิม:
 - `handleDelete` ใน `src/app/admin/page.tsx` ลบ `set_items` → `product_variants` → `products` โดยไม่เช็ค error ของ 2 ขั้นแรก · variant ที่มีแถวใน `order_items`/`stock_transactions`/`bag` ลบไม่ได้ (FK) แต่ variant อื่นของสินค้าเดียวกันอาจถูกลบไปแล้ว แล้วจึงขึ้นข้อความ "ลบไม่ได้ เนื่องจากมี order…"
 
 ### B4 ⚪ หน้า `/admin/orders`, `/admin/preorders`, `/admin/redeems` ไม่เช็ค role ฝั่ง client

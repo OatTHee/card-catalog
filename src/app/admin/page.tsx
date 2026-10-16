@@ -102,14 +102,18 @@ export default function AdminPage() {
     const { data: productsData } = await supabase
       .from('products')
       .select('*, sellers(*), product_variants(*)')
+      .is('deleted_at', null)
       .order('sort_order', { ascending: true })
 
     const { data: sellersData } = await supabase.from('sellers').select('*')
     const { data: settings } = await supabase.from('settings').select('value').eq('key', 'shipping_fee').single()
 
+    // ตัวเลือกที่ถูกลบ (deleted_at) ไม่ต้องโชว์ในหลังบ้าน
     const sorted = (productsData ?? []).map(p => ({
       ...p,
-      product_variants: [...(p.product_variants ?? [])].sort((a: any, b: any) => a.sort_order - b.sort_order)
+      product_variants: (p.product_variants ?? [])
+        .filter((v: { deleted_at?: string | null }) => !v.deleted_at)
+        .sort((a: any, b: any) => a.sort_order - b.sort_order)
     }))
 
     setProducts(sorted)
@@ -119,25 +123,17 @@ export default function AdminPage() {
   }
 
   async function handleDelete(productId: string) {
-    if (!confirm('ลบสินค้านี้จริงไหม?')) return
+    if (!confirm('ลบสินค้านี้ออกจากร้านจริงไหม?\n(ออเดอร์และประวัติที่ลูกค้าเคยสั่งจะยังอยู่ครบ)')) return
 
-    const { data: variants } = await supabase
-      .from('product_variants')
-      .select('id')
-      .eq('product_id', productId)
-
-    const variantIds = (variants ?? []).map(v => v.id)
-
-    if (variantIds.length > 0) {
-      await supabase.from('set_items').delete().in('variant_id', variantIds)
-    }
-
-    await supabase.from('product_variants').delete().eq('product_id', productId)
-
-    const { error } = await supabase.from('products').delete().eq('id', productId)
+    // ไม่ลบแถวจริง (order_items / bag / stock_transactions อ้างถึง variant อยู่)
+    // แค่ประทับ deleted_at แล้วทุกหน้ากรองทิ้ง สินค้าจะหายไปจากร้าน
+    const { error } = await supabase
+      .from('products')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', productId)
 
     if (error) {
-      alert('ลบไม่ได้ เนื่องจากมี order ที่เคยสั่งซื้อสินค้านี้อยู่\nแนะนำให้ซ่อนสินค้าแทนครับ')
+      alert('ลบสินค้าไม่สำเร็จ: ' + error.message)
       return
     }
 
@@ -1025,7 +1021,16 @@ function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
   }
 
   async function handleDeleteVariant(variantId: string) {
-    await supabase.from('product_variants').delete().eq('id', variantId)
+    if (!confirm('ลบตัวเลือกนี้ออกจากร้านจริงไหม?')) return
+    // soft delete เหมือนลบสินค้า — ออเดอร์เก่า/ประวัติสต็อกยังอยู่ครบ
+    const { error } = await supabase
+      .from('product_variants')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', variantId)
+    if (error) {
+      alert('ลบตัวเลือกไม่สำเร็จ: ' + error.message)
+      return
+    }
     setVariants(variants.filter(v => v.id !== variantId))
     revalidateCatalog()
   }

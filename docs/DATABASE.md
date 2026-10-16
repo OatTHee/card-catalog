@@ -13,8 +13,8 @@ Project ref `joceifkrecfcntbjpsvn` · Postgres 17 · schema `public` · RLS เ�
 | ตาราง | แถว (โดยประมาณ) | หน้าที่ / คอลัมน์สำคัญ |
 |---|---|---|
 | `sellers` | 3 | ร้านค้า `type` ∈ `official \| admin \| vendor` (CHECK) · มี `contact_url` (ปุ่ม "ติดต่อซื้อ" ของสินค้าที่ไม่ใช่ official) · ตอนนี้: official "กลุ่ม DMT", vendor 2 ร้าน, **ไม่มี** type admin |
-| `products` | 47 | สินค้า `type` ∈ `set \| single \| accessory \| gacha` · `is_available` (แสดง/ซ่อน), `is_for_sale` (โชว์ `/catalog`), `is_for_redeem` (โชว์ `/redeem`), `is_preorder`, `sort_order`, `seller_id` |
-| `product_variants` | 236 | ตัวเลือกย่อย `price`, `stock`, `image_url`, `sort_order`, `redeem_points` (null = แลกแต้มไม่ได้) |
+| `products` | 47 | สินค้า `type` ∈ `set \| single \| accessory \| gacha` · `is_available` (แสดง/ซ่อน), `is_for_sale` (โชว์ `/catalog`), `is_for_redeem` (โชว์ `/redeem`), `is_preorder`, `sort_order`, `seller_id`, `deleted_at` (soft delete) |
+| `product_variants` | 236 | ตัวเลือกย่อย `price`, `stock`, `image_url`, `sort_order`, `redeem_points` (null = แลกแต้มไม่ได้), `deleted_at` (soft delete) |
 | `set_items` | 0 | รายการการ์ดในเซ็ต — ว่าง, RLS ไม่มี policy (ใช้งานไม่ได้จาก client) แต่ `/admin` ลบแถวในนี้ตอนลบสินค้า |
 | `settings` | 1 | key/value text — มีแค่ `shipping_fee = 40` · (`redeem_free_shipping_threshold` ถูกอ่านแต่ **ยังไม่มีแถว** → default 40) |
 | `user_profiles` | 2 | role `admin \| vendor` (+ `seller_id` ของ vendor) — ตอนนี้ admin 2 คน vendor 0 · `id` = `auth.users.id` |
@@ -33,7 +33,12 @@ Project ref `joceifkrecfcntbjpsvn` · Postgres 17 · schema `public` · RLS เ�
 | `gacha_rolls` | 6 | ผลการเปิดซอง (มีแถว = ซองนั้นเปิดแล้ว) |
 | `profile_address_history` | 10 | ประวัติที่อยู่แบบเก่า (อ้างอิงย้อนหลังเท่านั้น) |
 
-Foreign key ที่มีผลตอนลบ: `product_variants` ถูกอ้างจาก `order_items`, `stock_transactions`, `bag`, `gacha_configs`, `set_items` (ไม่มี ON DELETE CASCADE) → variant ที่เคยถูกขาย/เคยเปลี่ยนสต็อก **ลบไม่ได้** ให้ซ่อนสินค้าแทน
+Foreign key ที่มีผลตอนลบ (ตรวจซ้ำ 16 ต.ค. 2026 — ฉบับก่อนเขียนผิดว่าไม่มี cascade เลย):
+- `order_items.variant_id`, `bag.variant_id` → `product_variants` **ไม่มี cascade** → variant ที่เคยถูกขาย/อยู่ในกระเป๋า ลบแถวจริงไม่ได้
+- `stock_transactions`, `gacha_configs`, `set_items` → `product_variants` เป็น **ON DELETE CASCADE** (ลบ variant = ledger สต็อกหายด้วย)
+- `product_variants.product_id` → `products` และ `products.seller_id` → `sellers` เป็น **ON DELETE CASCADE** (ลบร้าน vendor = สินค้าของร้านหายตาม)
+
+**ลบสินค้า = soft delete** (migration `soft_delete_products`): `products.deleted_at` / `product_variants.deleted_at` (null = ยังอยู่) — `/admin` ประทับเวลาแทนการ DELETE, ทุกหน้า (`/catalog`, `/redeem`, `/admin`, `/admin/managebag`) กรอง `deleted_at is null`, `place_order` ปฏิเสธของที่ถูกลบ · ห้ามเขียนโค้ดใหม่ที่ DELETE แถว products/product_variants · กู้คืน: `update products set deleted_at = null where id = ...`
 
 ## RPC ที่เว็บเรียก
 

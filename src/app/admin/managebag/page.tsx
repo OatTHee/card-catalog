@@ -95,7 +95,8 @@ export default function AdminManageBagPage() {
         supabase.from('gacha_rolls').select('bag_id'),
         supabase
           .from('product_variants')
-          .select('id, name, stock, redeem_points, products(name, is_for_sale, is_for_redeem)')
+          .select('id, name, stock, redeem_points, products(name, is_for_sale, is_for_redeem, deleted_at)')
+          .is('deleted_at', null)
           .order('sort_order', { ascending: true })
       ])
 
@@ -156,7 +157,8 @@ export default function AdminManageBagPage() {
 
     setGroups(result)
     setVariants(
-      (variantRows ?? []).map((v: any) => ({
+      // ซ่อนสินค้าที่ถูกลบออกจากร้านแล้ว (ของที่อยู่ในกระเป๋าแล้วยังแสดงตามปกติ)
+      (variantRows ?? []).filter(v => !(v.products as unknown as { deleted_at?: string | null } | null)?.deleted_at).map((v: any) => ({
         id: v.id,
         label: `${v.products?.name ? v.products.name + ' — ' : ''}${v.name}`,
         stock: v.stock ?? 0,

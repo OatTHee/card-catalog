@@ -38,12 +38,14 @@ async function getProducts() {
         .from('products')
         .select('*')
         .eq('is_for_sale', true)
+        .is('deleted_at', null)
         .order('sort_order', { ascending: true })
     ),
     withRetry(() =>
       supabase
         .from('product_variants')
         .select('id, product_id, name, price, stock, image_url, sort_order')
+        .is('deleted_at', null)
         .order('sort_order', { ascending: true })
     ),
   ])
