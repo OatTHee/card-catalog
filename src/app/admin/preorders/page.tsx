@@ -48,7 +48,9 @@ export default function AdminPreordersPage() {
 
   async function loadOrders() {
     const { data: ordersData } = await supabase
-      .from('orders').select('*, customers(display_name, email)')
+      // พรีออเดอร์มีได้เฉพาะร้านกลุ่ม (official) — !inner + eq กรองที่ DB เลย ไม่ต้องดึงออเดอร์ร้านอื่นมา
+      .from('orders').select('*, customers(display_name, email), sellers!inner(id, name, type)')
+      .eq('sellers.type', 'official')
       .order('created_at', { ascending: false })
 
     const withItems = await Promise.all((ordersData ?? []).map(async order => {
