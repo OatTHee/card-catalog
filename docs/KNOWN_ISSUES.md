@@ -54,10 +54,9 @@ SQL ในไฟล์นี้เป็น **ร่าง ยังไม่ไ
 - `checkSecret()` คืน `true` ถ้าไม่มี env → ใครก็ได้ยิง `award_points` / `finish_tournament` (ใช้ service role) แจกแต้มเองได้
 - **ไม่ทราบว่าบน Vercel ตั้งไว้หรือยัง** → ถามเจ้าของ ถ้าตั้งแล้วข้อนี้ปิดได้ ถ้าจะแก้โค้ดให้ fail-closed (`return false` เมื่อไม่มี env) ต้องตั้ง env ก่อน deploy ไม่งั้นบอทใช้ไม่ได้
 
-### S6 🟡 `/api/notify` และ `/api/redeem-notify` ไม่เช็คว่าใครเรียก
-- `/api/notify` เอาทุกอย่างจาก body ไปโพสต์ Discord → ใครก็ได้สแปม/ปลอมแจ้งเตือนออเดอร์ในห้องแอดมิน
-- `/api/redeem-notify` รับ `historyId` อะไรก็ได้ → โพสต์ซ้ำรายการเก่าได้
-- แนวทาง: ให้ client ส่ง Bearer token แบบ `/api/upload` แล้วฝั่ง server ดึงข้อมูลออเดอร์จาก DB เองด้วย id (ไม่เชื่อ body) และเช็คว่าเป็นเจ้าของออเดอร์
+### S6 🟡 `/api/notify` และ `/api/redeem-notify` ไม่เช็คว่าใครเรียก — ✅ แก้ `/api/notify` แล้ว (branch `feature/multi-seller`)
+- `/api/notify` ตอนนี้ต้องมี `Authorization: Bearer <access_token>`, body รับแค่ `{ orderIds }` แล้วอ่านออเดอร์จาก DB ด้วย service role โดยกรอง `.eq('customer_id', user.id)` → ยิง order id ของคนอื่นไม่ได้ และปลอมเนื้อหาไม่ได้
+- **ยังค้าง**: `/api/redeem-notify` รับ `historyId` อะไรก็ได้ → โพสต์ซ้ำรายการเก่าได้ (แนวทางเดียวกัน: Bearer token + เช็คเจ้าของ `redeem_history`)
 
 ### S7 ⚪ อื่น ๆ
 - `/api/upload` ไม่ตรวจ `prefix` และชนิดไฟล์ — user ที่ login ระบุ prefix อะไรก็ได้ (ชื่อไฟล์มี timestamp+uuid จึงทับไฟล์เดิมยาก)
@@ -90,6 +89,10 @@ SQL ในไฟล์นี้เป็น **ร่าง ยังไม่ไ
 
 ### B4 ⚪ หน้า `/admin/orders`, `/admin/preorders`, `/admin/redeems` ไม่เช็ค role ฝั่ง client
 - ลูกค้าทั่วไปเปิดได้ แต่จะเห็นแค่ข้อมูลตัวเอง (RLS กัน) — เป็นเรื่องความเรียบร้อย ไม่ใช่ข้อมูลรั่ว
+
+### B6 ⚪ ปุ่ม "ติดต่อซื้อ" ของร้าน vendor ไม่มี href — ✅ แก้แล้ว (branch `feature/multi-seller`)
+- สาเหตุ: `/catalog` select `sellers` แค่ `id, type` แต่ `ProductCard` อ่าน `sellers.name` / `sellers.contact_url` → เป็น `undefined` ทั้งคู่ (ชื่อร้านว่าง, `<a>` ไม่มีลิงก์) เป็นมาตั้งแต่ก่อน branch นี้
+- แก้เป็น `select('id, type, name, contact_url')` · ยังไม่มีสินค้าร้าน vendor ในระบบ จึงไม่มีใครเจอปัญหานี้จริง
 
 ### B5 ⚪ ข้อสังเกตอื่น
 - ~~`place_order` เช็คสต็อกทีละบรรทัด ถ้าส่ง variant เดียวกันซ้ำหลายบรรทัด (ยิง API ตรง) อาจขายเกินสต็อก~~ ✅ แก้แล้วพร้อมฟีเจอร์โปรโมชัน (migration `promotions`) — นับสต็อกสะสมต่อ variant
