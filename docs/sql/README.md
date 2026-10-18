@@ -10,7 +10,7 @@ DB จริงคือ source of truth เสมอ (`select pg_get_functionde
 | 3 | `announcement_setting` | ข้อ 2 ประกาศหน้าร้าน |
 | 4 | `promotions` | ข้อ 4 โปรเหมา / ซื้อ 1 แถม 1 |
 | 5 | `preorder_rule_by_type` | แก้กติกาช่วงพรี: พรีได้เฉพาะเซ็ต + สินค้าที่ติ๊ก `in_preorder_promo` |
-| 6 | `multi_seller` | ระบบหลายร้าน: คอลัมน์ค่าส่ง/QR/บัญชี/ชื่อ env webhook ใน `sellers`, `orders.seller_id`, trigger ซิงก์ค่าส่ง, `_item_seller`/`_order_sellers`/`_place_order_one`/`place_order_multi` |
+| 6 | `multi_seller` + `multi_seller_rpc` (รัน 18 ต.ค. 2026 แยกเป็น 2 migration: ส่วนโครงสร้าง/ข้อมูล และส่วน RPC) | ระบบหลายร้าน: คอลัมน์ค่าส่ง/QR/บัญชี/ชื่อ env webhook ใน `sellers`, `orders.seller_id`, trigger ซิงก์ค่าส่ง, `_item_seller`/`_order_sellers`/`_place_order_one`/`place_order_multi` |
 
 ## ย้อนกลับ (ต้องย้อนจากตัวล่าสุดขึ้นไป: 6 → 5 → 4 → 3 → 2 → 1 และต้องขออนุมัติเจ้าของก่อนตามกฎ CLAUDE.md ข้อ 3)
 
