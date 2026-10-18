@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { canPreorder, type SellerCheckout } from './sellers'
 
 // โหมด "ช่วงพรีออเดอร์" (settings.preorder_mode = 'on' | 'off')
 //   เปิดอยู่ -> สินค้าร้าน official ที่สต็อกไม่พอ และ "พรีได้" ยังสั่งได้ ส่วนที่เกินสต็อกจะเป็นพรีออเดอร์
@@ -21,7 +22,8 @@ export function isBackorderEligible(product: { type?: string | null, in_preorder
 export interface VariantStockInfo {
   stock: number
   isPreorderProduct: boolean // สินค้าที่ติ๊ก "สินค้าพรีออเดอร์" ไว้ทั้งตัว (flow เดิม)
-  canBackorder: boolean      // โหมดเปิด + ร้าน official + พรีได้ (เซ็ต/โปรพรี) -> สั่งเกินสต็อกได้
+  canBackorder: boolean      // โหมดเปิด + ร้านที่พรีได้ + พรีได้ (เซ็ต/โปรพรี) -> สั่งเกินสต็อกได้
+  seller: SellerCheckout | null // ร้านเจ้าของ (ใช้แยกออเดอร์/ค่าส่ง/QR ใน /cart และ /checkout)
 }
 
 export interface LineSplit {
@@ -46,7 +48,7 @@ export async function loadVariantStockInfo(
   const [{ data: setting }, { data: rows }] = await Promise.all([
     supabase.from('settings').select('value').eq('key', PREORDER_MODE_KEY).maybeSingle(),
     variantIds.length
-      ? supabase.from('product_variants').select('id, stock, products(is_preorder, type, in_preorder_promo, sellers(type))').in('id', variantIds)
+      ? supabase.from('product_variants').select('id, stock, products(is_preorder, type, in_preorder_promo, sellers(id, name, type, shipping_fee, qr_image_url, payment_note))').in('id', variantIds)
       : Promise.resolve({ data: [] as unknown[] })
   ])
 
@@ -55,12 +57,13 @@ export async function loadVariantStockInfo(
   for (const row of (rows ?? []) as { id: string, stock: number, products: unknown }[]) {
     // relation แบบ many-to-one อาจมาเป็น object หรือ array แล้วแต่ type ที่ PostgREST เดา
     const p = (Array.isArray(row.products) ? row.products[0] : row.products) as
-      { is_preorder?: boolean, type?: string, in_preorder_promo?: boolean, sellers?: { type?: string } | { type?: string }[] | null } | null
-    const s = Array.isArray(p?.sellers) ? p?.sellers[0] : p?.sellers
+      { is_preorder?: boolean, type?: string, in_preorder_promo?: boolean, sellers?: SellerCheckout | SellerCheckout[] | null } | null
+    const s = (Array.isArray(p?.sellers) ? p?.sellers[0] : p?.sellers) ?? null
     info.set(row.id, {
       stock: row.stock ?? 0,
       isPreorderProduct: Boolean(p?.is_preorder),
-      canBackorder: modeOn && s?.type === 'official' && isBackorderEligible(p),
+      canBackorder: modeOn && canPreorder(s?.type) && isBackorderEligible(p),
+      seller: s,
     })
   }
   return { modeOn, info }
