@@ -45,3 +45,9 @@ export const WEBHOOK_ENV_ALLOWLIST = [
 export function isAllowedWebhookEnv(name: string | null | undefined): boolean {
   return typeof name === 'string' && (WEBHOOK_ENV_ALLOWLIST as readonly string[]).includes(name)
 }
+
+// PostgREST คืน relation แบบ many-to-one เป็น object หรือ array แล้วแต่ที่มันเดา
+export function sellerNameOf(row: { sellers?: SellerBasic | SellerBasic[] | null } | null | undefined): string {
+  const seller = Array.isArray(row?.sellers) ? row?.sellers[0] : row?.sellers
+  return seller?.name ?? 'ไม่ทราบร้าน'
+}
