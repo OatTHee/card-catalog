@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import Header from '@/components/Header'
 import { sortOrderItems } from '@/lib/orderItems'
+import { sellerNameOf } from '@/lib/sellers'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -32,7 +33,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
   }, [])
 
   async function loadOrder() {
-    const { data: orderData } = await supabase.from('orders').select('*').eq('id', params.id).single()
+    const { data: orderData } = await supabase.from('orders').select('*, sellers(name)').eq('id', params.id).single()
     if (!orderData) { window.location.href = '/orders'; return }
 
     const { data: itemsData } = await supabase.from('order_items').select('*').eq('order_id', params.id)
@@ -60,7 +61,10 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
       <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
         <div className="flex items-center gap-3">
           <a href="/orders" className="text-blue-500 text-sm">← กลับ</a>
-          <h2 className="font-bold text-blue-900 text-lg">คำสั่งซื้อ #{order.id.slice(0, 8)}</h2>
+          <div>
+            <h2 className="font-bold text-blue-900 text-lg">คำสั่งซื้อ #{order.id.slice(0, 8)}</h2>
+            <p className="text-xs text-blue-600">🏬 {sellerNameOf(order)}</p>
+          </div>
         </div>
 
         {/* สถานะ */}

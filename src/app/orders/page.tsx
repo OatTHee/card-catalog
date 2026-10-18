@@ -5,6 +5,7 @@ import { createClient } from '@supabase/supabase-js'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import { sortOrderItems } from '@/lib/orderItems'
+import { sellerNameOf } from '@/lib/sellers'
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
@@ -32,7 +33,7 @@ export default function OrdersPage() {
   async function loadOrders(userId: string) {
   const { data: ordersData } = await supabase
     .from('orders')
-    .select('*, order_items(*)')
+    .select('*, order_items(*), sellers(name)')
     .eq('customer_id', userId)
     .order('created_at', { ascending: false })
   setOrders(ordersData ?? [])
@@ -66,6 +67,7 @@ export default function OrdersPage() {
       <div className="flex justify-between items-start">
         <div>
           <p className="text-sm font-medium text-gray-800">คำสั่งซื้อ #{order.id.slice(0, 8)}</p>
+          <p className="text-xs text-blue-600">🏬 {sellerNameOf(order)}</p>
           <p className="text-xs text-gray-400">{new Date(order.created_at).toLocaleDateString('th-TH')}</p>
         </div>
         <div className="flex flex-col items-end gap-1">

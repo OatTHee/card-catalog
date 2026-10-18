@@ -1,4 +1,4 @@
-# ฐานข้อมูล Supabase (ตรวจจาก DB จริง 16 ต.ค. 2026)
+# ฐานข้อมูล Supabase (ตรวจจาก DB จริง 16 ต.ค. 2026 · อัปเดตส่วนหลายร้าน 18 ต.ค. 2026)
 
 Project ref `joceifkrecfcntbjpsvn` · Postgres 17 · schema `public` · RLS เปิดทุกตาราง
 **DB นี้ใช้ร่วมกับระบบอื่น** (บอท Discord + เว็บจัดทัวร์ Khosok) — แยกเป็น 2 กลุ่มด้านล่าง
@@ -12,15 +12,15 @@ Project ref `joceifkrecfcntbjpsvn` · Postgres 17 · schema `public` · RLS เ�
 
 | ตาราง | แถว (โดยประมาณ) | หน้าที่ / คอลัมน์สำคัญ |
 |---|---|---|
-| `sellers` | 3 | ร้านค้า `type` ∈ `official \| admin \| vendor` (CHECK) · มี `contact_url` (ปุ่ม "ติดต่อซื้อ" ของสินค้าที่ไม่ใช่ official) · ตอนนี้: official "กลุ่ม DMT", vendor 2 ร้าน, **ไม่มี** type admin |
+| `sellers` | 4 | ร้านค้า `type` ∈ `official \| admin \| vendor` (CHECK) · `contact_url` (ปุ่ม "ติดต่อซื้อ" ของร้าน vendor) · **คอลัมน์ของระบบหลายร้าน**: `shipping_fee` (ค่าส่งต่อ 1 ออเดอร์, default 40), `qr_image_url`, `payment_note` (ข้อความบัญชี/TrueWallet), `webhook_env` (**ชื่อ** env ของ Discord webhook ห้ามเก็บ URL) · ตอนนี้: official "กลุ่ม DMT", admin "แอฟโฟร่แมน ช็อป" (ค่าส่ง 50), vendor 2 ร้าน · **ซื้อบนเว็บได้ = official + admin** ส่วน vendor เป็นปุ่มติดต่อ |
 | `products` | 47 | สินค้า `type` ∈ `set \| single \| accessory \| gacha` · `is_available` (แสดง/ซ่อน), `is_for_sale` (โชว์ `/catalog`), `is_for_redeem` (โชว์ `/redeem`), `is_preorder` (สินค้าพรีถาวร), `in_preorder_promo` (อยู่ในโปรพรีออเดอร์ — ช่วงพรีเปิดอยู่ ของหมดก็พรีได้), `sort_order`, `seller_id`, `deleted_at` (soft delete) |
 | `product_variants` | 236 | ตัวเลือกย่อย `price`, `stock`, `image_url`, `sort_order`, `redeem_points` (null = แลกแต้มไม่ได้), `deleted_at` (soft delete) |
 | `set_items` | 0 | รายการการ์ดในเซ็ต — ว่าง, RLS ไม่มี policy (ใช้งานไม่ได้จาก client) แต่ `/admin` ลบแถวในนี้ตอนลบสินค้า |
-| `settings` | 3 | key/value text — `shipping_fee = 40`, `preorder_mode` (`on`\|`off` สวิตช์ช่วงพรีออเดอร์ในหน้า /admin), `announcement` (JSON ประกาศหน้าร้าน `{enabled,title,body,link_text,link_url,image_url,tone}` ดู `src/lib/announcement.ts`) · (`redeem_free_shipping_threshold` ถูกอ่านแต่ **ยังไม่มีแถว** → default 40) · **ไม่มี INSERT policy** — key ใหม่ต้อง insert ด้วย SQL |
+| `settings` | 3 | key/value text — `shipping_fee = 40` (**เป็นสำเนาของ `sellers.shipping_fee` ของร้าน official ที่ trigger เขียนให้ — ระบบแลกแต้มยังอ่าน key นี้ ห้ามแก้ตรงนี้ ให้แก้ที่แถวร้านใน `/admin`**), `preorder_mode` (`on`\|`off` สวิตช์ช่วงพรีออเดอร์ในหน้า /admin), `announcement` (JSON ประกาศหน้าร้าน `{enabled,title,body,link_text,link_url,image_url,tone}` ดู `src/lib/announcement.ts`) · (`redeem_free_shipping_threshold` ถูกอ่านแต่ **ยังไม่มีแถว** → default 40) · **ไม่มี INSERT policy** — key ใหม่ต้อง insert ด้วย SQL |
 | `user_profiles` | 2 | role `admin \| vendor` (+ `seller_id` ของ vendor) — ตอนนี้ admin 2 คน vendor 0 · `id` = `auth.users.id` |
 | `customers` | 146 | 1 แถวต่อผู้ใช้ที่ login (`id` = `auth.users.id`) · `points`, `exp`, `uid` (unique, จากระบบเก่า), `discord_id` (unique), `real_name`, `address_raw` (ที่อยู่แบบเก่า) |
 | `shipping_addresses` | 85 | ที่อยู่หลายที่ต่อคน `is_default` |
-| `orders` | 94 | `status` (CHECK `pending_payment\|paid\|shipping\|delivered\|cancelled`), `subtotal`, `shipping_fee`, `total`, `slip_url`, `tracking_number`, `stock_deducted`, `ship_together`, `preorder_status` (null ถ้าไม่แยกส่ง), `preorder_tracking_number`, `preorder_stock_deducted` |
+| `orders` | 94 | `seller_id` (**NOT NULL** — 1 ออเดอร์ = 1 ร้าน, ออเดอร์เก่าทั้งหมด backfill เป็นร้านกลุ่ม), `status` (CHECK `pending_payment\|paid\|shipping\|delivered\|cancelled`), `subtotal`, `shipping_fee`, `total`, `slip_url`, `tracking_number`, `stock_deducted`, `ship_together`, `preorder_status` (null ถ้าไม่แยกส่ง), `preorder_tracking_number`, `preorder_stock_deducted` |
 | `order_items` | 260 | `variant_id`, `name`, `price` (snapshot), `quantity`, `is_preorder` (snapshot), `is_backorder` (สั่งตอนของหมดในช่วงพรีออเดอร์ = **ไม่ได้ตัดสต็อก**, `_apply_stock_delta` ข้ามบรรทัดนี้), `promotion_id` / `promotion_name` (snapshot) / `promo_group` (จับกลุ่มโปร 1 ชุด) — แถวหัวโปรมี `variant_id = null` |
 | `promotions` | 0 | โปรหน้าร้าน `type` ∈ `bundle` (เหมา: `price` = ราคาเหมา) \| `b1g1` (ซื้อ 1 แถม 1: เลือก 2 ชิ้นคละ ชิ้นถูกฟรี) · `is_active` เปิด/ปิดเอง · RLS อ่านทุกคน เขียนเฉพาะ `is_admin()` |
 | `promotion_items` | 0 | สินค้าในโปร `promotion_id` (cascade), `variant_id`, `quantity` (ใช้กับเหมา) |
@@ -39,6 +39,7 @@ Foreign key ที่มีผลตอนลบ (ตรวจซ้ำ 16 ต.�
 - `order_items.variant_id`, `bag.variant_id` → `product_variants` **ไม่มี cascade** → variant ที่เคยถูกขาย/อยู่ในกระเป๋า ลบแถวจริงไม่ได้
 - `stock_transactions`, `gacha_configs`, `set_items` → `product_variants` เป็น **ON DELETE CASCADE** (ลบ variant = ledger สต็อกหายด้วย)
 - `product_variants.product_id` → `products` และ `products.seller_id` → `sellers` เป็น **ON DELETE CASCADE** (ลบร้าน vendor = สินค้าของร้านหายตาม)
+- `orders.seller_id` → `sellers` **ไม่มี cascade** → ร้านที่มีออเดอร์แล้ว ลบไม่ได้ (ปุ่มลบในหน้า `/admin` จำกัดเฉพาะ vendor อยู่แล้ว)
 
 **ลบสินค้า = soft delete** (migration `soft_delete_products`): `products.deleted_at` / `product_variants.deleted_at` (null = ยังอยู่) — `/admin` ประทับเวลาแทนการ DELETE, ทุกหน้า (`/catalog`, `/redeem`, `/admin`, `/admin/managebag`) กรอง `deleted_at is null`, `place_order` ปฏิเสธของที่ถูกลบ · ห้ามเขียนโค้ดใหม่ที่ DELETE แถว products/product_variants · กู้คืน: `update products set deleted_at = null where id = ...`
 
@@ -48,7 +49,10 @@ Foreign key ที่มีผลตอนลบ (ตรวจซ้ำ 16 ต.�
 
 | RPC | เรียกจาก | เช็คสิทธิ์ | ทำอะไร |
 |---|---|---|---|
-| `place_order(p_shipping_address_id, p_items, p_slip_url, p_ship_together)` | `/checkout` | `auth.uid()` + ที่อยู่ต้องเป็นของตัวเอง | ล็อก variant (`FOR UPDATE`) เช็คสต็อก, ราคา/ค่าส่งจาก DB, สร้าง order + items, ตัดสต็อก, คืน `{order_id, total, has_preorder, is_split, has_backorder, …}` · ปฏิเสธของที่ `deleted_at` · ถ้า `preorder_mode = on` + ร้าน official + (`type = 'set'` หรือ `in_preorder_promo`) + สต็อกไม่พอ → แยกบรรทัด (สินค้าประเภทอื่นที่ไม่ได้ติ๊ก = ปฏิเสธแบบเดิม · `is_preorder` ไม่เกี่ยว): ส่วนที่มีของ (ตัดสต็อก) + ส่วนเกิน (`is_preorder = is_backorder = true` ไม่ตัดสต็อก) · รับรายการโปร `{promotion_id, variant_ids}` (1 โปรต่อออเดอร์, ไม่ใช้ช่วงพรี, ราคาคิดฝั่ง DB ผ่าน `_promo_lines`) · นับสต็อกสะสมต่อ variant ในออเดอร์เดียว (บรรทัดซ้ำ/โปร+ชิ้นเดี่ยว ขายเกินไม่ได้) |
+| `place_order(p_shipping_address_id, p_items, p_slip_url, p_ship_together)` | **โค้ดเวอร์ชันเก่า** (คงไว้ให้ใช้ร่วมกันได้ช่วง deploy) | `auth.uid()` + ที่อยู่ต้องเป็นของตัวเอง | เช็คว่าตะกร้าเป็นของร้านเดียว (`_order_sellers`) ถ้าปนหลายร้าน raise · แล้วเรียก `_place_order_one` · ค่าที่คืนเหมือนเดิม (+ `seller_id`) |
+| `place_order_multi(p_shipping_address_id, p_items, p_slips, p_ship_together)` | `/checkout` (ของจริงตอนนี้) | `auth.uid()` + ที่อยู่ต้องเป็นของตัวเอง | จัดกลุ่ม item ตาม `products.seller_id` **ที่อ่านจาก DB เอง** (ไม่เชื่อ client) แล้วสร้าง 1 ออเดอร์ต่อร้านใน transaction เดียว · `p_slips` = `{"<seller_id>": "<slip_url>"}` ขาดร้านไหน raise · ร้านไหนไม่ผ่าน rollback ทั้งก้อน · คืน `{success, orders:[{order_id, seller_id, seller_name, subtotal, shipping_fee, total, has_preorder, is_split, has_backorder}], total}` |
+| `_place_order_one(p_user_id, p_shipping_address_id, p_seller_id, p_items, p_slip_url, p_ship_together)` | ถูกเรียกจาก `place_order` / `place_order_multi` เท่านั้น (revoke จาก anon/authenticated) | ผู้เรียกเช็ค login/ที่อยู่มาก่อน | ไส้เดิมของ `place_order`: ล็อก variant (`FOR UPDATE`) เช็คสต็อก, ราคาจาก DB, **ค่าส่งจาก `sellers.shipping_fee` ของร้านนั้น**, ทุก item ต้องเป็นของร้านนั้นจริงไม่งั้น raise, สร้าง order + items, ตัดสต็อก, นับสต็อกสะสมต่อ variant · ปฏิเสธของที่ `deleted_at` · ถ้า `preorder_mode = on` + **ร้าน official** + (`type = 'set'` หรือ `in_preorder_promo`) + สต็อกไม่พอ → แยกบรรทัด: ส่วนที่มีของ (ตัดสต็อก) + ส่วนเกิน (`is_preorder = is_backorder = true` ไม่ตัดสต็อก) · **ร้าน admin/vendor พรีไม่ได้เลย ถึงจะยิง RPC ตรงก็ตาม** · รับรายการโปร `{promotion_id, variant_ids}` (1 โปรต่อออเดอร์, โปรต้องเป็นของร้านเดียวกัน, ราคาคิดฝั่ง DB ผ่าน `_promo_lines`) |
+| `_item_seller(p_item)` · `_order_sellers(p_items)` | ภายใน (revoke จาก anon/authenticated) | — | หาร้านเจ้าของของรายการในตะกร้าจาก DB (โปรที่มีของหลายร้าน = raise) |
 | `redeem_to_bag(p_items)` | `RedeemCard` | `auth.uid()` | เช็คสต็อก/แต้ม ตัดสต็อก หักแต้ม ใส่ bag — **⚠️ ใช้ `points` ที่ client ส่งมา ดู KNOWN_ISSUES #S2** |
 | `open_gacha_pack(p_bag_id)` | `/redeem` | เจ้าของ bag หรือ admin | สุ่มรางวัลผ่าน `_resolve_gacha_pack` ต่อชื่อผลไว้ท้าย `bag.item_name` |
 | `bridge_bag_to_history(p_shipping_address_id, p_slip_url, p_is_merge_order)` | `/redeem` | `auth.uid()` | รวมของ In Bag ทั้งหมด (เปิดซองค้าง) ตัดสินส่งฟรี สร้าง `redeem_history` เปลี่ยน bag เป็น Shipped |
@@ -68,6 +72,7 @@ Foreign key ที่มีผลตอนลบ (ตรวจซ้ำ 16 ต.�
 |---|---|---|
 | `orders` | `trg_sync_stock_on_order_status` (BEFORE UPDATE OF status) | เปลี่ยนเป็น `cancelled` + `stock_deducted` = คืนสต็อก (ถ้าแยกส่ง คืนเฉพาะของพร้อมส่ง) · เปิดออเดอร์ที่ยกเลิกกลับมา = ตัดสต็อกใหม่ |
 | `orders` | `trg_sync_stock_on_preorder_status` (BEFORE UPDATE OF preorder_status) | แบบเดียวกันแต่เฉพาะของพรี ในออเดอร์ที่แยกส่ง |
+| `sellers` | `trg_sync_shipping_fee_setting` (AFTER INSERT/UPDATE OF shipping_fee, type) | แก้ค่าส่งของร้าน **official** = เขียน `settings.shipping_fee` ให้ตรงกัน (ระบบแลกแต้มอ่าน key นี้) |
 | `product_variants` | `trg_log_stock_change` (AFTER UPDATE OF stock) | เขียน `stock_transactions` |
 | `customers` | `trg_log_wallet_change` (AFTER UPDATE OF points, exp) | เขียน `wallet_transactions` (`ref_type='manual'`) — RPC ต่าง ๆ แก้ `reason/ref_type` ของแถวล่าสุดทีหลัง |
 | `customers` | `trg_fill_discord_id_on_customer_insert` (BEFORE INSERT) | เติม `discord_id` จาก `auth.users` |
@@ -96,5 +101,6 @@ Foreign key ที่มีผลตอนลบ (ตรวจซ้ำ 16 ต.�
 
 ## Migrations
 
+migration ล่าสุดของเว็บนี้คือ `multi_seller` (18 ต.ค. 2026 — ดู `docs/sql/6_multi_seller.sql`)
 `list_migrations` มี 19 รายการ (`20260731032215_legacy_accounts_admin_fix` … `20261011161828_khosok_tournament_deletions`) — ตารางหลักของร้าน (sellers/products/orders/…) ถูกสร้างก่อนเริ่มเก็บ migration จึงไม่มีในรายการ
 ไฟล์ SQL ที่เคยเขียนไว้ (เก็บใน Claude Project "DMT Promo Shop": `claude/preorder_feature.sql`, `claude/fix_checkout_stock_place_order.sql`, `claude/admin_bag_rpcs.sql`) ถูก apply ไปแล้วตาม migration ชื่อเดียวกัน — ใช้ DB จริงเป็นตัวอ้างอิง ไม่ใช่ไฟล์เหล่านั้น

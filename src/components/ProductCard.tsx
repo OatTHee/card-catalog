@@ -3,15 +3,17 @@
 import { addToCart } from '@/lib/cart'
 import { SHOP_CLOSED } from '@/lib/shopStatus'
 import { isBackorderEligible } from '@/lib/preorder'
+import { canCheckout, canPreorder } from '@/lib/sellers'
 import { useState } from 'react'
 import Image from 'next/image'
 
 export default function ProductCard({ product, preorderMode = false }: { product: any, preorderMode?: boolean }) {
   const [showModal, setShowModal] = useState(false)
 
-  const isOfficial = product.sellers?.type === 'official'
-  // ช่วงพรีออเดอร์: สินค้าร้าน official ที่หมด สั่งพรีได้เฉพาะเซ็ต หรือที่แอดมินติ๊ก "อยู่ในโปรพรีออเดอร์"
-  const canBackorder = preorderMode && isOfficial && isBackorderEligible(product)
+  // ซื้อบนเว็บได้ = ร้านกลุ่ม (official) หรือร้านแอดมิน (admin) · ร้าน vendor ยังเป็นปุ่ม "ติดต่อซื้อ"
+  const canBuy = canCheckout(product.sellers?.type)
+  // ช่วงพรีออเดอร์: เฉพาะร้านกลุ่ม ที่หมด สั่งพรีได้เฉพาะเซ็ต หรือที่แอดมินติ๊ก "อยู่ในโปรพรีออเดอร์"
+  const canBackorder = preorderMode && canPreorder(product.sellers?.type) && isBackorderEligible(product)
   const variants = product.product_variants ?? []
   const totalStock = variants.reduce((sum: number, v: any) => sum + v.stock, 0)
   const isAvailable = totalStock > 0
@@ -59,7 +61,7 @@ export default function ProductCard({ product, preorderMode = false }: { product
       {showModal && (
         <ProductModal
           product={product}
-          isOfficial={isOfficial}
+          canBuy={canBuy}
           canBackorder={canBackorder}
           variants={variants}
           onClose={() => setShowModal(false)}
@@ -69,9 +71,9 @@ export default function ProductCard({ product, preorderMode = false }: { product
   )
 }
 
-function ProductModal({ product, isOfficial, canBackorder, variants, onClose }: {
+function ProductModal({ product, canBuy, canBackorder, variants, onClose }: {
   product: any
-  isOfficial: boolean
+  canBuy: boolean
   canBackorder: boolean
   variants: any[]
   onClose: () => void
@@ -178,7 +180,7 @@ function ProductModal({ product, isOfficial, canBackorder, variants, onClose }: 
     )}
 
     <div className="mt-4">
-      {!isOfficial ? (
+      {!canBuy ? (
         <a
           href={product.sellers?.contact_url}
           target="_blank"

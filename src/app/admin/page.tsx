@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { revalidateCatalog } from '@/app/actions/revalidate'
 import { PREORDER_MODE_KEY, isPreorderModeOn } from '@/lib/preorder'
+import { canCheckout, WEBHOOK_ENV_ALLOWLIST } from '@/lib/sellers'
 import AnnouncementEditor from '@/components/AnnouncementEditor'
 import PromotionManager from '@/components/PromotionManager'
 import {
@@ -63,7 +64,6 @@ export default function AdminPage() {
   const [showAddProduct, setShowAddProduct] = useState(false)
   const [products, setProducts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [shippingFee, setShippingFee] = useState('')
   const [preorderMode, setPreorderMode] = useState(false)
   const [savingPreorderMode, setSavingPreorderMode] = useState(false)
 
@@ -71,6 +71,7 @@ export default function AdminPage() {
   const [mode, setMode] = useState<'manage' | 'shelf'>('manage')
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<StockFilter>('all')
+  const [sellerFilter, setSellerFilter] = useState<string>('all')
   const [detailId, setDetailId] = useState<string | null>(null)
 
   const [shelf, setShelf] = useState<Record<ShelfKey, any[]>>({ official: [], admin: [], vendor: [], other: [] })
@@ -97,11 +98,6 @@ export default function AdminPage() {
     }
 
     loadProducts()
-  }
-
-  async function handleUpdateShipping() {
-    await supabase.from('settings').update({ value: shippingFee }).eq('key', 'shipping_fee')
-    alert('บันทึกแล้ว')
   }
 
   async function handleTogglePreorderMode() {
@@ -132,7 +128,6 @@ export default function AdminPage() {
       .order('sort_order', { ascending: true })
 
     const { data: sellersData } = await supabase.from('sellers').select('*')
-    const { data: settings } = await supabase.from('settings').select('value').eq('key', 'shipping_fee').single()
     const { data: modeRow } = await supabase.from('settings').select('value').eq('key', PREORDER_MODE_KEY).maybeSingle()
 
     // นับของพรีที่สั่งตอนของหมด (ไม่ได้ตัดสต็อก) ที่ยังค้างส่ง ต่อ variant
@@ -160,7 +155,6 @@ export default function AdminPage() {
 
     setProducts(sorted)
     setSellers(sellersData ?? [])
-    if (settings) setShippingFee(settings.value)
     setPreorderMode(isPreorderModeOn(modeRow?.value))
     setLoading(false)
   }
@@ -270,14 +264,18 @@ export default function AdminPage() {
     return hay.includes(q)
   })
 
+  // ตัวกรองร้าน (สินค้าที่ยังไม่ได้ตั้งร้านใช้คีย์ 'none')
+  const inSellerScope = (p: any) => sellerFilter === 'all' || (p.seller_id ?? 'none') === sellerFilter
   const counts = {
-    all: searched.length,
-    visible: searched.filter(p => p.is_available).length,
-    hidden: searched.filter(p => !p.is_available).length,
-    out: searched.filter(p => totalStock(p) === 0).length,
+    all: searched.filter(inSellerScope).length,
+    visible: searched.filter(p => inSellerScope(p) && p.is_available).length,
+    hidden: searched.filter(p => inSellerScope(p) && !p.is_available).length,
+    out: searched.filter(p => inSellerScope(p) && totalStock(p) === 0).length,
   }
 
-  const visibleProducts = searched.filter(p => {
+  const bySeller = searched.filter(p => inSellerScope(p))
+
+  const visibleProducts = bySeller.filter(p => {
     if (filter === 'visible') return p.is_available
     if (filter === 'hidden') return !p.is_available
     if (filter === 'out') return totalStock(p) === 0
@@ -327,6 +325,16 @@ export default function AdminPage() {
               </div>
 
               <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
+                <SellerChip active={sellerFilter === 'all'} onClick={() => setSellerFilter('all')} label="ทุกร้าน" />
+                {sellers.map(seller => (
+                  <SellerChip
+                    key={seller.id}
+                    active={sellerFilter === seller.id}
+                    onClick={() => setSellerFilter(seller.id)}
+                    label={`🏬 ${seller.name}`}
+                  />
+                ))}
+                <span className="w-px h-5 bg-slate-200 mx-1" />
                 <FilterChip active={filter === 'all'} onClick={() => setFilter('all')} label="ทั้งหมด" count={counts.all} />
                 <FilterChip active={filter === 'visible'} onClick={() => setFilter('visible')} label="แสดงอยู่" count={counts.visible} />
                 <FilterChip active={filter === 'hidden'} onClick={() => setFilter('hidden')} label="ซ่อนอยู่" count={counts.hidden} />
@@ -421,20 +429,15 @@ export default function AdminPage() {
 
         {mode === 'manage' && (
           <div className="mt-8 bg-white rounded-xl p-4 border border-slate-200">
-            <h2 className="font-semibold mb-3 text-sm text-slate-700">ตั้งค่าค่าส่ง</h2>
-            <div className="flex gap-2 items-center">
-              <input
-                value={shippingFee}
-                onChange={e => setShippingFee(e.target.value)}
-                type="number"
-                className="border border-slate-300 rounded px-3 py-2 text-sm w-32"
-              />
-              <span className="text-sm text-slate-500">บาท</span>
-              <button onClick={handleUpdateShipping}
-                className="text-sm bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
-                บันทึก
-              </button>
-            </div>
+            <h2 className="font-semibold mb-1 text-sm text-slate-700">ค่าส่ง / QR / บัญชี ของแต่ละร้าน</h2>
+            <p className="text-xs text-slate-500">
+              ย้ายไปตั้งที่ปุ่ม <b>ร้านค้า</b> ด้านบนแล้ว (ค่าส่งแยกตามร้าน คิดต่อ 1 ออเดอร์)
+              · ค่าส่งของร้านกลุ่มถูกซิงก์ไปใช้ในระบบแลกแต้มให้อัตโนมัติ
+            </p>
+            <button onClick={() => setShowManageVendors(true)}
+              className="mt-2 text-sm bg-slate-100 text-slate-700 px-3 py-2 rounded-lg hover:bg-slate-200">
+              เปิดหน้าต่างร้านค้า
+            </button>
           </div>
         )}
 
@@ -520,6 +523,19 @@ function FilterChip({ active, onClick, label, count }: {
 }
 
 // การ์ดสินค้าในโหมดจัดการ - หน้าตาใกล้เคียงหน้าลูกค้า แต่เติมสต็อกกับสถานะซ่อนให้แอดมินเห็น
+function SellerChip({ active, onClick, label }: {
+  active: boolean, onClick: () => void, label: string
+}) {
+  return (
+    <button onClick={onClick}
+      className={`text-xs px-3 py-1.5 rounded-lg border ${active
+        ? 'bg-slate-800 text-white border-slate-800'
+        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>
+      {label}
+    </button>
+  )
+}
+
 function AdminProductCard({ product, onClick }: { product: any, onClick: () => void }) {
   const stock = totalStock(product)
   const price = minPrice(product)
@@ -1650,41 +1666,68 @@ function ManageVendorsModal({ sellers, onClose, onSaved }: {
     }
     setInviting(false)
   }
+
   async function handleDeleteVendor(sellerId: string) {
-  if (!confirm('ลบ vendor นี้จริงไหม?')) return
-  
-  // ลบ user_profiles ของ vendor นี้ก่อน
-  await supabase
-    .from('user_profiles')
-    .delete()
-    .eq('seller_id', sellerId)
+    if (!confirm('ลบ vendor นี้จริงไหม?')) return
 
-  // แล้วค่อยลบ seller
-  const { error } = await supabase
-    .from('sellers')
-    .delete()
-    .eq('id', sellerId)
+    // ลบ user_profiles ของ vendor นี้ก่อน
+    await supabase
+      .from('user_profiles')
+      .delete()
+      .eq('seller_id', sellerId)
 
-  if (error) {
-    setMessage('เกิดข้อผิดพลาด: ' + error.message)
-  } else {
-    setMessage('ลบ vendor สำเร็จ')
-    onSaved()
+    // แล้วค่อยลบ seller (ร้านที่มีออเดอร์แล้วจะลบไม่ได้ เพราะ orders.seller_id อ้างถึงอยู่)
+    const { error } = await supabase
+      .from('sellers')
+      .delete()
+      .eq('id', sellerId)
+
+    if (error) {
+      setMessage('เกิดข้อผิดพลาด: ' + error.message)
+    } else {
+      setMessage('ลบ vendor สำเร็จ')
+      onSaved()
+    }
   }
-}
-  const vendors = sellers.filter(s => s.type === 'vendor')
+
+  // ร้านกลุ่ม/ร้านแอดมินขึ้นก่อน แล้วค่อย vendor
+  const rank = (t: string) => (t === 'official' ? 0 : t === 'admin' ? 1 : 2)
+  const sorted = [...sellers].sort((a, b) =>
+    rank(a.type) - rank(b.type) || String(a.name).localeCompare(String(b.name), 'th'))
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-lg w-full max-w-lg max-h-screen overflow-y-auto p-6">
-        <h2 className="text-lg font-bold mb-4">จัดการ Vendor</h2>
+        <h2 className="text-lg font-bold mb-1">จัดการร้านค้า</h2>
+        <p className="text-xs text-gray-500 mb-4">
+          ค่าส่ง / QR / ข้อความบัญชี ของแต่ละร้าน ใช้ในหน้าชำระเงินของร้านนั้น
+          · ค่าส่งของร้านกลุ่มถูกใช้เป็นค่าส่งของระบบแลกแต้มด้วย
+        </p>
 
         {message && (
           <p className="text-sm text-green-600 mb-3">{message}</p>
         )}
 
-        <div className="mb-6">
-          <h3 className="text-sm font-medium text-gray-700 mb-2">เพิ่ม Vendor ใหม่</h3>
+        <div className="space-y-3">
+          {sorted.map(seller => (
+            <SellerEditor
+              key={seller.id}
+              seller={seller}
+              onSaved={onSaved}
+              onMessage={setMessage}
+              onDelete={seller.type === 'vendor' ? () => handleDeleteVendor(seller.id) : undefined}
+              invite={seller.type === 'vendor' ? {
+                email,
+                setEmail,
+                inviting,
+                onInvite: () => handleInvite(seller.id)
+              } : undefined}
+            />
+          ))}
+        </div>
+
+        <div className="mt-6 border-t pt-4">
+          <h3 className="text-sm font-medium text-gray-700 mb-2">เพิ่ม Vendor ใหม่ (ร้านฝากขาย/มือสอง)</h3>
           <div className="space-y-2">
             <input
               value={name}
@@ -1708,42 +1751,6 @@ function ManageVendorsModal({ sellers, onClose, onSaved }: {
           </div>
         </div>
 
-        {vendors.length > 0 && (
-          <div>
-            <h3 className="text-sm font-medium text-gray-700 mb-2">Vendor ที่มีอยู่</h3>
-            <div className="space-y-3">
-              {vendors.map(v => (
-                <div key={v.id} className="border rounded p-3">
-                  <p className="text-sm font-medium">{v.name}</p>
-<div className="flex justify-between items-center mb-2">
-  <p className="text-xs text-gray-400">{v.contact_url}</p>
-  <button
-    onClick={() => handleDeleteVendor(v.id)}
-    className="text-xs text-red-400 hover:text-red-600"
-  >
-    ลบ
-  </button>
-</div>                  <div className="flex gap-2">
-                    <input
-                      placeholder="อีเมล vendor"
-                      value={email}
-                      onChange={e => setEmail(e.target.value)}
-                      className="flex-1 border rounded px-2 py-1 text-sm"
-                    />
-                    <button
-                      onClick={() => handleInvite(v.id)}
-                      disabled={inviting}
-                      className="text-xs bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600 disabled:opacity-50"
-                    >
-                      {inviting ? '...' : 'Invite'}
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         <button
           onClick={onClose}
           className="w-full border py-2 rounded text-sm hover:bg-gray-50 mt-6"
@@ -1751,6 +1758,175 @@ function ManageVendorsModal({ sellers, onClose, onSaved }: {
           ปิด
         </button>
       </div>
+    </div>
+  )
+}
+
+const SELLER_TYPE_LABEL: Record<string, string> = {
+  official: 'ร้านกลุ่ม (ขายบนเว็บ + ใช้ช่วงพรีออเดอร์ได้)',
+  admin: 'ร้านแอดมิน (ขายบนเว็บ ไม่มีพรีออเดอร์)',
+  vendor: 'ร้านฝากขาย (หน้าร้านเป็นปุ่มติดต่อซื้อ)',
+}
+
+function SellerEditor({ seller, onSaved, onMessage, onDelete, invite }: {
+  seller: any
+  onSaved: () => void
+  onMessage: (msg: string) => void
+  onDelete?: () => void
+  invite?: { email: string, setEmail: (v: string) => void, inviting: boolean, onInvite: () => void }
+}) {
+  const [open, setOpen] = useState(false)
+  const [name, setName] = useState(seller.name ?? '')
+  const [contactUrl, setContactUrl] = useState(seller.contact_url ?? '')
+  const [shippingFee, setShippingFee] = useState(String(seller.shipping_fee ?? ''))
+  const [paymentNote, setPaymentNote] = useState(seller.payment_note ?? '')
+  const [qrUrl, setQrUrl] = useState(seller.qr_image_url ?? '')
+  const [webhookEnv, setWebhookEnv] = useState(seller.webhook_env ?? '')
+  const [uploading, setUploading] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  // ร้านที่ขายบนเว็บได้เท่านั้นที่ต้องมีค่าส่ง/QR/บัญชี/webhook
+  const canSell = canCheckout(seller.type)
+
+  async function handleQrChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    const url = await uploadImage(file, 'qr/')
+    setUploading(false)
+    if (!url) { onMessage('อัปโหลดรูป QR ไม่สำเร็จ'); return }
+    setQrUrl(url)
+  }
+
+  async function handleSave() {
+    setSaving(true)
+    const fee = Number(shippingFee)
+    const { error } = await supabase
+      .from('sellers')
+      .update({
+        name,
+        contact_url: contactUrl,
+        shipping_fee: shippingFee !== '' && Number.isFinite(fee) ? fee : 40,
+        payment_note: paymentNote || null,
+        qr_image_url: qrUrl || null,
+        webhook_env: webhookEnv || null,
+      })
+      .eq('id', seller.id)
+    setSaving(false)
+    if (error) {
+      onMessage('เกิดข้อผิดพลาด: ' + error.message)
+      return
+    }
+    onMessage(`บันทึกข้อมูลร้าน ${name} แล้ว`)
+    onSaved()
+    revalidateCatalog()
+  }
+
+  return (
+    <div className="border rounded p-3">
+      <div className="flex justify-between items-start gap-2">
+        <div className="min-w-0">
+          <p className="text-sm font-medium truncate">🏬 {seller.name}</p>
+          <p className="text-xs text-gray-400">{SELLER_TYPE_LABEL[seller.type] ?? seller.type}</p>
+          {canSell && (
+            <p className="text-xs text-gray-500 mt-0.5">
+              ค่าส่ง ฿{seller.shipping_fee ?? 40}
+              {seller.qr_image_url ? ' · มี QR' : ' · ยังไม่มี QR'}
+              {seller.webhook_env ? ` · ${seller.webhook_env}` : ' · ยังไม่ตั้ง webhook'}
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <button onClick={() => setOpen(!open)} className="text-xs text-blue-500 hover:text-blue-700">
+            {open ? 'ปิด' : 'แก้ไข'}
+          </button>
+          {onDelete && (
+            <button onClick={onDelete} className="text-xs text-red-400 hover:text-red-600">ลบ</button>
+          )}
+        </div>
+      </div>
+
+      {open && (
+        <div className="mt-3 space-y-2 border-t pt-3">
+          <label className="block text-xs text-gray-500">ชื่อร้าน
+            <input value={name} onChange={e => setName(e.target.value)}
+              className="mt-1 w-full border rounded px-2 py-1.5 text-sm" />
+          </label>
+          <label className="block text-xs text-gray-500">ลิงก์ติดต่อ
+            <input value={contactUrl} onChange={e => setContactUrl(e.target.value)}
+              className="mt-1 w-full border rounded px-2 py-1.5 text-sm" />
+          </label>
+
+          {canSell && (
+            <>
+              <label className="block text-xs text-gray-500">ค่าส่ง (บาท ต่อ 1 ออเดอร์)
+                <input value={shippingFee} onChange={e => setShippingFee(e.target.value)} type="number"
+                  className="mt-1 w-32 border rounded px-2 py-1.5 text-sm" />
+              </label>
+              {seller.type === 'official' && (
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                  ค่าส่งของร้านกลุ่มจะถูกซิงก์ไปใช้ในระบบแลกแต้ม (/redeem) ให้อัตโนมัติ
+                </p>
+              )}
+
+              <label className="block text-xs text-gray-500">ข้อความบัญชี / TrueWallet (ขึ้นบรรทัดใหม่ได้)
+                <textarea value={paymentNote} onChange={e => setPaymentNote(e.target.value)} rows={3}
+                  placeholder={'🏦 ธนาคาร: 1234567890 (ชื่อบัญชี)'}
+                  className="mt-1 w-full border rounded px-2 py-1.5 text-sm" />
+              </label>
+
+              <div>
+                <p className="text-xs text-gray-500">รูป QR ชำระเงิน</p>
+                {/* QR ของร้านกลุ่มอยู่บน host ภายนอก (i.postimg.cc) ที่ next/image ไม่อนุญาต จึงใช้ img ธรรมดา */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                {qrUrl && <img src={qrUrl} className="w-32 mt-1 rounded border" alt="QR" />}
+                <div className="flex items-center gap-2">
+                  <input type="file" accept="image/*" onChange={handleQrChange} className="mt-1 text-xs" />
+                  {qrUrl && (
+                    <button onClick={() => setQrUrl('')} className="text-xs text-red-400 hover:text-red-600">
+                      ลบรูป QR
+                    </button>
+                  )}
+                </div>
+                {uploading && <p className="text-xs text-gray-400">กำลังอัปโหลด...</p>}
+              </div>
+
+              <label className="block text-xs text-gray-500">Discord webhook (เลือกชื่อ env — ค่าจริงตั้งใน Vercel)
+                <select value={webhookEnv} onChange={e => setWebhookEnv(e.target.value)}
+                  className="mt-1 w-full border rounded px-2 py-1.5 text-sm">
+                  <option value="">ไม่แจ้งเตือน</option>
+                  {WEBHOOK_ENV_ALLOWLIST.map(env => (
+                    <option key={env} value={env}>{env}</option>
+                  ))}
+                </select>
+              </label>
+            </>
+          )}
+
+          <button onClick={handleSave} disabled={saving}
+            className="w-full bg-blue-500 text-white py-2 rounded text-sm hover:bg-blue-600 disabled:opacity-50">
+            {saving ? 'กำลังบันทึก...' : 'บันทึกข้อมูลร้าน'}
+          </button>
+
+          {invite && (
+            <div className="flex gap-2 border-t pt-2">
+              <input
+                placeholder="อีเมล vendor (ให้ล็อกอินแก้สินค้าตัวเองได้)"
+                value={invite.email}
+                onChange={e => invite.setEmail(e.target.value)}
+                className="flex-1 border rounded px-2 py-1 text-sm"
+              />
+              <button
+                onClick={invite.onInvite}
+                disabled={invite.inviting}
+                className="text-xs bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600 disabled:opacity-50"
+              >
+                {invite.inviting ? '...' : 'Invite'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

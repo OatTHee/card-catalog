@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { sortOrderItems } from '@/lib/orderItems'
+import { sellerNameOf } from '@/lib/sellers'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -22,8 +23,12 @@ export default function AdminOrdersPage() {
   const [loading, setLoading] = useState(true)
   const [selectedOrder, setSelectedOrder] = useState<any>(null)
   const [filter, setFilter] = useState<'active' | 'all'>('active')
+  // ตัวกรองร้าน — รับค่าเริ่มต้นจาก ?seller=<id> (ลิงก์จากการ์ดแจ้งเตือน Discord ของร้านนั้น)
+  const [sellerFilter, setSellerFilter] = useState<string>('all')
 
   useEffect(() => {
+    const fromUrl = new URLSearchParams(window.location.search).get('seller')
+    if (fromUrl) setSellerFilter(fromUrl)
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) { window.location.href = '/login'; return }
       loadOrders()
@@ -32,7 +37,7 @@ export default function AdminOrdersPage() {
 
   async function loadOrders() {
     const { data: ordersData } = await supabase
-      .from('orders').select('*, customers(display_name, email)')
+      .from('orders').select('*, customers(display_name, email), sellers(id, name, type)')
       .order('created_at', { ascending: false })
 
     const ordersWithItems = await Promise.all((ordersData ?? []).map(async order => {
@@ -72,7 +77,16 @@ export default function AdminOrdersPage() {
   // ค้างอยู่ = ยังไม่ได้ส่งถึงมือลูกค้า และไม่ได้ถูกยกเลิก
   const isActive = (o: any) => o.status !== 'delivered' && o.status !== 'cancelled'
   const activeCount = orders.filter(isActive).length
-  const visibleOrders = filter === 'active' ? orders.filter(isActive) : orders
+  // รายชื่อร้านสร้างจากออเดอร์ที่โหลดมาแล้ว (ไม่ต้อง query sellers เพิ่ม)
+  type SellerOption = { id: string, name: string }
+  const sellerOptions = [...new Map(orders
+    .map(o => (Array.isArray(o.sellers) ? o.sellers[0] : o.sellers) as SellerOption | null)
+    .filter((x): x is SellerOption => Boolean(x?.id))
+    .map(x => [x.id, x] as const)).values()]
+  const byStatus = filter === 'active' ? orders.filter(isActive) : orders
+  const visibleOrders = sellerFilter === 'all'
+    ? byStatus
+    : byStatus.filter(o => o.seller_id === sellerFilter)
 
   if (loading) return <div className="min-h-screen bg-gray-50 flex items-center justify-center">กำลังโหลด...</div>
 
@@ -106,6 +120,25 @@ export default function AdminOrdersPage() {
       </header>
 
       <div className="max-w-5xl mx-auto px-4 py-6">
+        {sellerOptions.length > 1 && (
+          <div className="flex flex-wrap gap-1 mb-4">
+            <button
+              onClick={() => setSellerFilter('all')}
+              className={`text-xs px-3 py-1.5 rounded-lg border ${sellerFilter === 'all' ? 'bg-blue-500 text-white border-blue-500' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+            >
+              ทุกร้าน
+            </button>
+            {sellerOptions.map(seller => (
+              <button
+                key={seller.id}
+                onClick={() => setSellerFilter(seller.id)}
+                className={`text-xs px-3 py-1.5 rounded-lg border ${sellerFilter === seller.id ? 'bg-blue-500 text-white border-blue-500' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+              >
+                🏬 {seller.name}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="space-y-3">
           {visibleOrders.length === 0 && (
             <div className="bg-white rounded-xl p-8 text-center text-gray-400">
@@ -119,6 +152,7 @@ export default function AdminOrdersPage() {
                 <div className="flex justify-between items-start">
                   <div>
                     <p className="font-medium text-gray-800">#{order.id.slice(0, 8)}</p>
+                    <p className="text-xs text-blue-600">🏬 {sellerNameOf(order)}</p>
                     <p className="text-sm text-gray-500">{order.customers?.display_name} | {order.customers?.email}</p>
                     <p className="text-xs text-gray-400">{new Date(order.created_at).toLocaleString('th-TH')}</p>
                   </div>

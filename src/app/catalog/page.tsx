@@ -37,7 +37,8 @@ async function getProducts() {
   )
 
   const [sellersRes, productsRes, variantsRes, settingsRes, promotionsRes] = await Promise.all([
-    withRetry(() => supabase.from('sellers').select('id, type')),
+    // name/contact_url ใช้ใน ProductCard (ชื่อร้าน + ปุ่ม "ติดต่อซื้อ" ของร้าน vendor)
+    withRetry(() => supabase.from('sellers').select('id, type, name, contact_url')),
     withRetry(() =>
       supabase
         .from('products')

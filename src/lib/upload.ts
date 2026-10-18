@@ -20,12 +20,13 @@ export async function compressImage(file: File, maxWidthPx = 800): Promise<Blob>
   })
 }
 
-export async function uploadImage(file: File): Promise<string | null> {
+// prefix: 'products/' (รูปสินค้า) · 'qr/' (รูป QR ของร้าน)
+export async function uploadImage(file: File, prefix = 'products/'): Promise<string | null> {
   const compressed = await compressImage(file)
 
   const formData = new FormData()
   formData.append('file', compressed, `${Date.now()}.webp`)
-  formData.append('prefix', 'products/')
+  formData.append('prefix', prefix)
 
   const { data: { session } } = await supabase.auth.getSession()
   const res = await fetch('/api/upload', {
