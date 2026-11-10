@@ -33,7 +33,7 @@
 | `/admin/orders` | client | ออเดอร์ "ของพร้อมส่ง" เปลี่ยนสถานะ/ใส่เลขพัสดุ (ตัวกรอง ค้างอยู่/ทั้งหมด + **ตัวกรองร้าน** รับ `?seller=<id>` จากลิงก์ใน Discord) | `orders` + `sellers(id,name,type)`, `order_items`, `shipping_addresses` |
 | `/admin/preorders` | client | ออเดอร์ที่มีของพรี **เฉพาะร้านกลุ่ม (official)** — ถ้าแยกส่ง ใช้ `preorder_status`/`preorder_tracking_number` | เหมือนข้างบน (กรองด้วย `sellers!inner.type=official`) |
 | `/admin/redeems` | client | รายการแลกแต้ม เปลี่ยนสถานะ | `redeem_history`, `legacy_accounts` |
-| `/admin/players` | client | ดู/แก้แต้ม EXP สถิติ ของผู้เล่นทุกคน (ทั้ง claim แล้วและยังไม่ claim) | `legacy_accounts`, `customers`, `player_stats`, RPC `admin_adjust_wallet` |
+| `/admin/players` | client | ดู/แก้แต้ม EXP สถิติ ของผู้เล่นทุกคน (ทั้ง claim แล้วและยังไม่ claim) | `legacy_accounts`, `customers`, `player_stats`, RPC `admin_adjust_wallet`, `admin_season_status`, `admin_season_reset_exp` (ปุ่มรีซีซั่น EXP) |
 | `/admin/managebag` | client | ดู/เพิ่ม/แก้/ลบของในกระเป๋าผู้ใช้ | `bag`, `customers`, `gacha_rolls`, `product_variants`, RPC `admin_bag_*` |
 
 การกันหน้า admin ฝั่ง client (เช็ค `user_profiles.role === 'admin'` แล้ว redirect): มีใน `/admin`, `/admin/players`, `/admin/managebag` — **ไม่มี**ใน `/admin/orders`, `/admin/preorders`, `/admin/redeems` (เช็คแค่ว่า login) ข้อมูลไม่รั่วเพราะ RLS กันไว้ แต่หน้าเปิดได้

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
+import SeasonResetButton from '@/components/SeasonResetButton'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -331,6 +332,9 @@ export default function AdminPlayersPage() {
           <span className="text-xs text-gray-400">
             ทั้งหมด {rows.length} คน · claim แล้ว {rows.filter(r => r.claimed).length} · ยังไม่ claim {rows.filter(r => !r.claimed).length}
           </span>
+          <div className="sm:ml-auto">
+            <SeasonResetButton supabase={supabase} onDone={loadPlayers} />
+          </div>
         </div>
 
         <div className="space-y-3">

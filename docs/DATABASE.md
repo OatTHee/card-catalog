@@ -58,6 +58,8 @@ Foreign key ที่มีผลตอนลบ (ตรวจซ้ำ 16 ต.�
 | `bridge_bag_to_history(p_shipping_address_id, p_slip_url, p_is_merge_order)` | `/redeem` | `auth.uid()` | รวมของ In Bag ทั้งหมด (เปิดซองค้าง) ตัดสินส่งฟรี สร้าง `redeem_history` เปลี่ยน bag เป็น Shipped |
 | `claim_legacy_account(p_user_id)` | `/auth/confirm` | ต้องเป็นตัวเองหรือ admin | เคลม `legacy_accounts` แบบ atomic (กัน race) ย้ายแต้ม/EXP/สถิติ/bag/history |
 | `admin_adjust_wallet(p_discord_id, p_points_delta, p_exp_delta, p_reason)` | `/admin/players` | `is_admin()` | ปรับแต้ม/EXP คนที่ claim แล้ว |
+| `admin_season_status()` | `/admin/players` (ปุ่มรีซีซั่น) | `is_admin()` | ซีซั่นล่าสุดใน `season_archive` + ยอด EXP ที่จะถูกล้าง + Top 3 |
+| `admin_season_reset_exp(p_closing_season, p_new_season)` | `/admin/players` (ปุ่มรีซีซั่น) | `is_admin()` | เรียก `season_reset_exp` (ไม่เปิดให้ client เรียกตรง): archive ลง `season_archive` → `customers.exp = 0` → log `ref_type='season_reset'` แตะเฉพาะ EXP |
 | `admin_bag_add_item(p_customer_id, p_item_name, p_points_used, p_qty, p_variant_id, p_deduct_stock)` | `/admin/managebag` | `is_admin()` | เพิ่มของเข้ากระเป๋า (เลือกตัดสต็อกได้) |
 | `admin_bag_update_item(p_bag_id, p_qty, p_item_name, p_points_used)` | `/admin/managebag` | `is_admin()` | แก้รายการในกระเป๋า |
 | `admin_bag_remove_item(p_bag_id, p_restore_stock)` | `/admin/managebag` | `is_admin()` | ลบรายการ (เลือกคืนสต็อกได้) |

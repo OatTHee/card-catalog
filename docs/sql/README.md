@@ -11,8 +11,24 @@ DB จริงคือ source of truth เสมอ (`select pg_get_functionde
 | 4 | `promotions` | ข้อ 4 โปรเหมา / ซื้อ 1 แถม 1 |
 | 5 | `preorder_rule_by_type` | แก้กติกาช่วงพรี: พรีได้เฉพาะเซ็ต + สินค้าที่ติ๊ก `in_preorder_promo` |
 | 6 | `multi_seller` + `multi_seller_rpc` (รัน 18 ต.ค. 2026 แยกเป็น 2 migration: ส่วนโครงสร้าง/ข้อมูล และส่วน RPC) | ระบบหลายร้าน: คอลัมน์ค่าส่ง/QR/บัญชี/ชื่อ env webhook ใน `sellers`, `orders.seller_id`, trigger ซิงก์ค่าส่ง, `_item_seller`/`_order_sellers`/`_place_order_one`/`place_order_multi` |
+| 7 | `season_reset_exp_framework` (รัน 2 พ.ย. 2026) | ตาราง `season_archive`, `exp_title()`, `season_reset_exp()` (หลังบ้านเท่านั้น) — ใช้ปิด SS6 → SS7 |
+| 8 | `admin_season_reset` | ปุ่มรีซีซั่น EXP ใน `/admin/players`: `admin_season_status()`, `admin_season_reset_exp()` |
 
-## ย้อนกลับ (ต้องย้อนจากตัวล่าสุดขึ้นไป: 6 → 5 → 4 → 3 → 2 → 1 และต้องขออนุมัติเจ้าของก่อนตามกฎ CLAUDE.md ข้อ 3)
+## ย้อนกลับ (ต้องย้อนจากตัวล่าสุดขึ้นไป: 8 → 7 → 6 → 5 → 4 → 3 → 2 → 1 และต้องขออนุมัติเจ้าของก่อนตามกฎ CLAUDE.md ข้อ 3)
+
+**8 admin_season_reset** (เอาปุ่มออก — ไม่กระทบข้อมูล)
+```sql
+drop function if exists public.admin_season_reset_exp(text, text);
+drop function if exists public.admin_season_status();
+```
+
+**7 season_reset_exp_framework**
+> ⚠️ ฟังก์ชันลบได้ แต่ **การรีซีซั่นที่ทำไปแล้วไม่ย้อนเองอัตโนมัติ** — ถ้าต้องคืน EXP ของซีซั่น X ให้ใช้ยอดใน `season_archive` (`update customers c set exp = c.exp + a.exp from season_archive a where a.season = 'X' and a.user_id = c.id;`) ต้องขออนุมัติก่อน และควรทำก่อน drop ตาราง
+```sql
+drop function if exists public.season_reset_exp(text, text);
+drop function if exists public.exp_title(integer);
+drop table if exists public.season_archive;   -- ยอด EXP ปิดซีซั่นเก่าหายถาวร
+```
 
 **6 multi_seller**
 > ⚠️ ย้อนได้สะอาดเฉพาะ **ก่อน** ร้านใหม่เริ่มมีออเดอร์ — ถ้ามีออเดอร์ของร้านใหม่แล้ว การ drop `orders.seller_id` จะทำให้ข้อมูลว่าออเดอร์ไหนของร้านไหนหายไป (ให้หยุดแค่ขั้น 1-3)
